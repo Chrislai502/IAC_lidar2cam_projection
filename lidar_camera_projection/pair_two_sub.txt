@@ -1,0 +1,28 @@
+import rclpy
+from rclpy.duration import Duration
+
+class ImagePointCloudPair:
+    def __init__(self):
+        # ...
+        self.image_msg = None
+        self.point_cloud_msg = None
+
+    def image_callback(self, msg):
+        self.image_msg = msg
+        if self.point_cloud_msg is not None:
+            self.pair_image_point_cloud()
+
+    def point_cloud_callback(self, msg):
+        self.point_cloud_msg = msg
+        if self.image_msg is not None:
+            self.pair_image_point_cloud()
+
+    def pair_image_point_cloud(self):
+        # Check if the timestamps of the image and point cloud data are close enough
+        time_threshold = Duration(seconds=0.1)  # set the time threshold to 0.1 seconds
+        time_difference = self.image_msg.header.stamp - self.point_cloud_msg.header.stamp
+        if abs(time_difference) < time_threshold:
+            # Process the image and point cloud data here
+            pass
+        self.image_msg = None
+        self.point_cloud_msg = None

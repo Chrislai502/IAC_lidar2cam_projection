@@ -39,9 +39,17 @@ class Lidar2Cam(Node):
             callback    = self.callback,
             qos_profile = self.qos_profile
         )
+        # self.cam_info_sub = self.create_subscription(
+        #     msg_type    = CameraInfo,
+        #     topic       = '/vimba_front_left/camera_info',
+        #     callback    = self.cam_info_callback,
+        #     qos_profile = rclpy.qos.QoSProfile(depth=1) 
+        # )
+
         self.pointcloud_sub  # prevent unused variable warning
 
         self.marker_pub = self.create_publisher(PointCloud2, "/lidar2cam_ptc", rclpy.qos.qos_profile_sensor_data)
+        # self.marker_pub = self.create_publisher(PointCloud2, "/lidar2cam_ptc", rclpy.qos.qos_profile_sensor_data)
         
         # self.ptc_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw/ground_filtered", self.qos_profile)
         # self.ptc_raw_sub    = Subscriber(PointCloud2, "/luminar_front_points/points_raw", self.callback, self.qos_profile)
@@ -49,10 +57,19 @@ class Lidar2Cam(Node):
 
         self.rate = self.create_rate(0.01) #2Hz
 
+    # def cam_info_callback(self, msg):
+    #     print('received ')
+
+
     def callback(self, ptc):
         self.marker_pub.publish(ptc)
         # while(True):
         ptc_numpy = np.array([p for p in pc2.read_points(ptc, field_names = ("x", "y", "z"), skip_nans=False, uvs = [])]) # uvs: only give the points in the list
+        camera_info = np.array([[251.935177, 0.000000, 260.887279], 
+                                [0.000000, 252.003440, 196.606218], 
+                                [0.000000, 0.000000, 1.000000]])
+        
+        
         # ptc_gen = pc2.read_points(ptc, field_names = ("x", "y", "z"), skip_nans=True)
         # ptc_numpy = np.array(next(ptc_gen).append(0)) # append the order stamp
         # ptc = []

@@ -1,61 +1,171 @@
-import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
+# import rclpy
+# from rclpy.node import Node
+# from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
-from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D 
-from builtin_interfaces.msg import Duration
-from visualization_msgs.msg import Marker
-from sensor_msg.msgs import PointCloud2
-from sensor_msg.msgs import Image
-from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
-from sensor_msg.msgs import CameraInfo
-from sensor_msgs_py import pc2
+# from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D 
+# from builtin_interfaces.msg import Duration
+# from visualization_msgs.msg import Marker
+# from sensor_msg.msgs import PointCloud2
+# from sensor_msg.msgs import Image
+# from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
+# from sensor_msg.msgs import CameraInfo
+# from sensor_msgs_py import pc2
 
-import cv2
+# import cv2
 
-class Lidar2Cam(Node):
-    def __init__(self):
-        super().__init__('lidar_to_cam_node')
+# class Lidar2Cam(Node):
+#     def __init__(self):
+#         super().__init__('lidar_to_cam_node')
+#         self.ptc = PointCloud2 
+
+#         # -------------------------------- QOS Profile ------------------------------- #
+#         self.qos_profile =  QoSProfile(
+#             reliability=QoSReliabilityPolicy.BEST_EFFORT,
+#             history=QoSHistoryPolicy.KEEP_LAST,
+#             depth=1,
+#         )
+
+#         # ------------------------------- Timer Callback ------------------------------ #
+#         self.lidar_freq = 30.0
+#         self.camera_freq = 39.0
+#         self.sample_freq = min(self.lidar_freq, self.camera_freq)
+#         self.timer_ = self.create_timer()
+
+#         # ------------------------------- Subscriptions ------------------------------ #
+#         # ----------------------------------- LIDAR ---------------------------------- #
+#         self.pointcloud_sub = self.create_subscription(
+#             msg_type    = PointCloud2,
+#             topic       = '/luminar_front_points/points_raw',
+#             callback    = self.pc2_callback,
+#             qos_profile = self.qos_profile
+#         )
+#         self.pointcloud_sub  # prevent unused variable warning
+
+#         # ---------------------------------- Bounding Box Object---------------------------------- #
+#         self.pointcloud_sub = self.create_subscription(
+#             msg_type    = PointCloud2,
+#             topic       = '/luminar_front_points/points_raw',
+#             callback    = self.pc2_callback,
+#             qos_profile = self.qos_profile
+#         )
 
 
-        # -------------------------------- QOS Profile ------------------------------- #
-        self.qos_profile =  QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1,
-        )
-
-        # ------------------------------- Subscriptions ------------------------------ #
-        # ----------------------------------- LIDAR ---------------------------------- #
-        self.pointcloud_sub = self.create_subscription(
-            msg_type    = PointCloud2,
-            topic       = '/luminar_front_points/points_raw',
-            callback    = self.pc2_callback,
-            qos_profile = self.qos_profile
-        )
-        self.pointcloud_sub  # prevent unused variable warning
-
-        # ---------------------------------- CAMERA ---------------------------------- #
-
-        self.marker_pub = self.create_publisher(PointCloud2, "/lidar2cam_ptc", rclpy.qos.qos_profile_sensor_data)
+#         self.marker_pub = self.create_publisher(PointCloud2, "/lidar2cam_ptc", rclpy.qos.qos_profile_sensor_data)
         
-        # self.ptc_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw/ground_filtered", self.qos_profile)
-        self.ptc_raw_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw", self.callback, self.qos_profile)
+#         # self.ptc_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw/ground_filtered", self.qos_profile)
+#         self.ptc_raw_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw", self.callback, self.qos_profile)
         
 
-        self.rate = self.create_rate(1) #2Hz
-        self.counter = 0
+#         self.rate = self.create_rate(1) #2Hz
+#         self.counter = 0
+
+#     self.timer_callback():
+
+# class ImagePointCloudPair:
+#     super().__init__('lidar_to_cam_node')
+#     self.ptc = PointCloud2 
+
+#     # -------------------------------- QOS Profile ------------------------------- #
+#     self.qos_profile =  QoSProfile(
+#         reliability=QoSReliabilityPolicy.BEST_EFFORT,
+#         history=QoSHistoryPolicy.KEEP_LAST,
+#         depth=1,
+#     )
+
+#     # ------------------------------- Subscriptions ------------------------------ #
+#     # ----------------------------------- LIDAR ---------------------------------- #
+#     self.pointcloud_sub = self.create_subscription(
+#         msg_type    = PointCloud2,
+#         topic       = '/luminar_front_points/points_raw',
+#         callback    = self.pc2_callback,
+#         qos_profile = self.qos_profile
+#     )
+#     self.pointcloud_sub  # prevent unused variable warning
+
+#     # ---------------------------------- Bounding Box Object---------------------------------- #
+#     self.pointcloud_sub = self.create_subscription(
+#         msg_type    = PointCloud2,
+#         topic       = '/luminar_front_points/points_raw',
+#         callback    = self.pc2_callback,
+#         qos_profile = self.qos_profile
+#     )
+
+#     def __init__(self):
+#         self.box_msg = None
+#         self.point_cloud_msg = None
+
+#     def box_callback(self, msg):
+#         self.box_msg = msg
+#         if self.point_cloud_msg is not None:
+#             self.pair_box_point_cloud()
+
+#     def point_cloud_callback(self, msg):
+#         self.point_cloud_msg = msg
+#         if self.box_msg is not None:
+#             self.pair_box_point_cloud()
+
+#     def pair_box_point_cloud(self):
+#         # Lidar camera projection right here4
+
+#         self.box_msg = None
+#         self.point_cloud_msg = None
 
 
-    def callback(self, ptc):
-        while(True):
-            if (self.counter == 20):
-                print("Published!")
-                ptc_numpy = pc2.read_points_numpy(ptc)
-                print(ptc_numpy)
-                # self.marker_pub.publish(ptc_numpy)
-                self.counter += 1
-            self.rate.sleep()
+
+    # def callback(self, ptc):
+    #     while(True):
+    #         if (self.counter == 20):
+    #             print("Published!")
+    #             ptc_numpy = pc2.read_points_numpy(ptc)
+    #             print(ptc_numpy)
+    #             # self.marker_pub.publish(ptc_numpy)
+    #             self.counter += 1
+    #         self.rate.sleep()
+
+
+# class Lidar2Cam(Node):
+#     def __init__(self):
+#         super().__init__('lidar_to_cam_node')
+
+
+#         # -------------------------------- QOS Profile ------------------------------- #
+#         self.qos_profile =  QoSProfile(
+#             reliability=QoSReliabilityPolicy.BEST_EFFORT,
+#             history=QoSHistoryPolicy.KEEP_LAST,
+#             depth=1,
+#         )
+
+#         # ------------------------------- Subscriptions ------------------------------ #
+#         # ----------------------------------- LIDAR ---------------------------------- #
+#         self.pointcloud_sub = self.create_subscription(
+#             msg_type    = PointCloud2,
+#             topic       = '/luminar_front_points/points_raw',
+#             callback    = self.pc2_callback,
+#             qos_profile = self.qos_profile
+#         )
+#         self.pointcloud_sub  # prevent unused variable warning
+
+#         # ---------------------------------- CAMERA ---------------------------------- #
+
+#         self.marker_pub = self.create_publisher(PointCloud2, "/lidar2cam_ptc", rclpy.qos.qos_profile_sensor_data)
+        
+#         # self.ptc_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw/ground_filtered", self.qos_profile)
+#         self.ptc_raw_sub    = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw", self.callback, self.qos_profile)
+        
+
+#         self.rate = self.create_rate(1) #2Hz
+#         self.counter = 0
+
+
+#     def callback(self, ptc):
+#         while(True):
+#             if (self.counter == 20):
+#                 print("Published!")
+#                 ptc_numpy = pc2.read_points_numpy(ptc)
+#                 print(ptc_numpy)
+#                 # self.marker_pub.publish(ptc_numpy)
+#                 self.counter += 1
+#             self.rate.sleep()
 
 
 
@@ -107,7 +217,6 @@ class Lidar2Cam(Node):
 #         self.image_left_sub  = Subscriber(self, Image, "/vimba_front_left_center/image", self.qos_profile)
 #         self.image_right_sub = Subscriber(self, Image, "/vimba_front_right_center/image", self.qos_profile)
 #         self.ptc_sub         = Subscriber(self, PointCloud2, "/luminar_front_points/points_raw/ground_filtered", self.qos_profile)
-        
 #         queue_size = 30
 
 #         # you can use ApproximateTimeSynchronizer if msgs dont have exactly the same timestamp

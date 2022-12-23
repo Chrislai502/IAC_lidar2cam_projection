@@ -3,10 +3,12 @@
 The bag to play in /media/Public/ROSBAG_BACKUPS
 source ~/ART/iac_launch/install/setup.bash
 ros2 bag play rosbag2_2022_11_09-16_27_25
+ros2 bag play rosbag2_2022_09_21-12_58_49 # cars at the very start
 
 # Running the Yolo node
 ~/ROAR_ROS/iac_dev_ws$ source install/setup.bash 
 ros2 run tensorrt_yolov7 tensorrt_yolov7_node_exe --ros-args -p engine_path:="/home/roar/ART/perception/model_trials/NVIDIA_AI_IOT_tensorrt_yolov7/yolo_deepstream/tensorrt_yolov7/build/yolov7PTQ.engine" -p debug:=0 -p frame_id:="a"
+ros2 bag play rosbag2_2022_09_21-12_58_49 -l # cars at the very start
 
 DetectedObjectsWithFeature.msg
     std_msgs/Header header
@@ -19,7 +21,9 @@ DetectedObjectsWithFeature.msg
         Feature.msg
             sensor_msgs/PointCloud2 cluster
             sensor_msgs/RegionOfInterest roi
-        
+
+
+
 # LIDAR documentation is at 
 /ART/perception/Documentation/LiDAR
 
@@ -36,13 +40,14 @@ ros2 pkg create --build-type ament_cmake <pkg_name>
 ros2 pkg create --build-type ament_python <pkg_name>
 ros2 pkg create <pkg-name> --dependencies [deps]
 
-
-# catkin_make
+# colcon build
 colcon build --symlink-install
+colcon build --packages-skip
 After the build is finished, we should see the build, install, and log directories:
 colcon test
 source install/setup.bash
 colcon build --packages-select my_package
+colcon build --continue-on-error
 
 # Utility
     ros2 node list

@@ -9,6 +9,7 @@ ros2 bag play rosbag2_2022_09_21-12_58_49 # cars at the very start
 ~/ROAR_ROS/iac_dev_ws$ source install/setup.bash 
 ros2 run tensorrt_yolov7 tensorrt_yolov7_node_exe --ros-args -p engine_path:="/home/roar/ART/perception/model_trials/NVIDIA_AI_IOT_tensorrt_yolov7/yolo_deepstream/tensorrt_yolov7/build/yolov7PTQ.engine" -p debug:=0 -p frame_id:="a"
 ros2 bag play rosbag2_2022_09_21-12_58_49 -l # cars at the very start
+ros2 run lidar_camera_projection lidarchris_node 
 
 DetectedObjectsWithFeature.msg
     std_msgs/Header header
@@ -23,6 +24,8 @@ DetectedObjectsWithFeature.msg
             sensor_msgs/RegionOfInterest roi
 
 
+(2.5599694, 4.4500227, 1.4030075, 0.00927734, 76., 0.)
+[2.55289531 4.43779612 1.39913034]
 
 # LIDAR documentation is at 
 /ART/perception/Documentation/LiDAR
@@ -68,10 +71,13 @@ colcon build --continue-on-error
     ros2 bag record <topic_name> # records all the topics
     ros2 bag record -o <bagfile_name> <topic_name1> <topic_name2>
     ros2 bag info <bag_file_name>
+    ros2 bag cut -i rosbag2_2022_09_21-12_58_49 -o chris_cars_only -s 00:00:00 -e 00:00:20
     ros2 bag play
 
 # tf2 Analyze Tools
-    ros2 run tf2_tools view_frames
+ros2 run tf2_tools view_frames
+ros2 run tf2_ros tf2_echo target_frame source_frame time
+
 
 # Copy files around
 scp -r ./rtl88x2bu/ roar@192.168.1.69:~/Downloads

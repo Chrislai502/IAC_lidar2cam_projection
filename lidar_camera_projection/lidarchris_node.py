@@ -15,23 +15,10 @@ import cv2
 # from mpl_toolkits.mplot3d import Axes3D
 from cv_bridge import CvBridge, CvBridgeError
 # import ros2_numpy as rp
-from ros2_numpy.point_cloud2 import array_to_pointcloud2
-
-# ros2_numpy Shit
-DUMMY_FIELD_PREFIX = '__'
-type_mappings = [(PointField.INT8, np.dtype('int8')),
-                (PointField.UINT8, np.dtype('uint8')),
-                (PointField.INT16, np.dtype('int16')),
-                (PointField.UINT16, np.dtype('uint16')),
-                (PointField.INT32, np.dtype('int32')),
-                (PointField.UINT32, np.dtype('uint32')),
-                (PointField.FLOAT32, np.dtype('float32')),
-                (PointField.FLOAT64, np.dtype('float64'))]
-nptype_to_pftype = dict((nptype, pftype) for pftype, nptype in type_mappings)
-import sys
-# ros2_numpy shit ends
+from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, get_xyz_points
 class Lidar2Cam(Node):
     def __init__(self):
+        print("Initialized Lidar2Cam Node!")
         super().__init__('lidar_to_cam_node')
         self.bridge = CvBridge()
         self.point_cloud_msg = None
@@ -39,19 +26,31 @@ class Lidar2Cam(Node):
         self.box_msg = None
 
         # Front Left Camera only
-        self.camera_info     = np.array([[494.186152, 0.000000, 521.646677],
-                                        [0.000000, 494.988972, 389.133925],
-                                        [0.000000, 0.000000, 1.000000]])  
-        self.camera_info_inv = np.linalg.inv(np.array([[494.186152, 0.000000, 521.646677],
-                                            [0.000000, 494.988972, 389.133925],
-                                            [0.000000, 0.000000, 1.000000]]))
-        self.RotMat = np.array([[  0.5732029, -0.8194135,  0.0000000],
-                                    [0.8194135,  0.5732029,  0.0000000],
-                                    [0.0000000,  0.0000000,  1.0000000] ])
-        self.translation = np.array([-0.058, 0.171, -0.026])
+        # self.camera_info     = np.array([[494.186152, 0.000000, 521.646677],
+        #                                 [0.000000, 494.988972, 389.133925],
+        #                                 [0.000000, 0.000000, 1.000000]])  
+        # self.camera_info     = np.array([[494.186152, 0.000000, 52.1*1],
+        #                                 [0.000000, 494.988972, 38.9*1],
+        #                                 [0.000000, 0.000000, 1]]) 
+        # self.camera_info     = np.array([[494.186152, 0.000000, 0],
+        #                                 [0.000000, 494.186152, 0],
+        #                                 [0.000000, 0.000000, 1]]) 
+        self.camera_info = np.array([[1.732571708, 0.000000, 0.549797164], 
+                                     [0.000000, 1.731274561, 0.295484988], 
+                                     [0.000000, 0.000000, 1.000000]])
+        # self.camera_info_inv = np.linalg.inv(np.array([[494.186152, 0.000000, 521.646677],
+        #                                                 [0.000000, 494.988972, 389.133925],
+        #                                                 [0.000000, 0.000000, 1.000000]]))
+        # self.RotMat = np.array([[  0.5732029, 0.8194135,  0.0000000],
+        #                         [-0.8194135,  0.5732029,  0.0000000],
+        #                         [0.0000000,  0.0000000,  1.0000000] ])
+        # self.RotMat=np.identity(3)
+        # self.translation = np.array([0.007, -0.121, 0.026])*-1
+        # self.translation = np.array([0, 0, 0])
 
-        self.RotMat_K      = self.camera_info @ self.RotMat
-        self.translation_K = self.camera_info @ self.translation
+        # self.RotMat_K      = self.camera_info @ self.RotMat
+        # self.RotMat_K=np.identity(3)
+        # self.translation_K = self.camera_info @ self.translation
 
         # -------------------------------- QOS Profile ------------------------------- #
         self.qos_profile =  QoSProfile(
@@ -64,7 +63,7 @@ class Lidar2Cam(Node):
         # ----------------------------------- LIDAR ---------------------------------- #
         self.pointcloud_sub = self.create_subscription(
             msg_type    = PointCloud2,
-            topic       = '/luminar_front_points/points_raw',
+            topic       = '/luminar_front_points',
             callback    = self.point_cloud_callback,
             qos_profile = self.qos_profile
         )
@@ -89,21 +88,26 @@ class Lidar2Cam(Node):
         self.image_sub # prevent unused variable warning
 
         # ------------------------------- Publishers ------------------------------ #
-        self.cloud_pub = self.create_publisher(PointCloud2, "/vimba_front_left_center/out/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
-        self.image_pub = self.create_publisher(Image, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
+        self.image_pub = self.create_publisher(Image , "/vimba_front_left_center/out/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
+        self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
         
 
     def image_callback(self, msg):
+        print("I")
         self.image_msg = msg
 
     def box_callback(self, msg):
+        print("B")
         self.box_msg = msg
         if self.point_cloud_msg is not None:
+            print("+")
             self.pair_box_point_cloud()
 
     def point_cloud_callback(self, msg):
+        print("P")
         self.point_cloud_msg = msg
         if self.box_msg is not None:
+            print("+")
             self.pair_box_point_cloud()
 
     '''Helper functions'''
@@ -126,64 +130,6 @@ class Lidar2Cam(Node):
             print(e)
         return image
 
-
-    '''Convert a numpy record datatype into a list of PointFields.'''
-    def dtype_to_fields(self, dtype):
-
-        fields = []
-        for field_name in dtype.names:
-            np_field_type, field_offset = dtype.fields[field_name]
-            pf = PointField()
-            pf.name = field_name
-            if np_field_type.subdtype:
-                item_dtype, shape = np_field_type.subdtype
-                pf.count = int(np.prod(shape))
-                np_field_type = item_dtype
-            else:
-                pf.count = 1
-
-            pf.datatype = nptype_to_pftype[np_field_type]
-            pf.offset = field_offset
-            fields.append(pf)
-        return fields
-
-    '''Converts a numpy record array to a sensor_msgs.msg.PointCloud2.'''
-    def array_to_pointcloud2(self, cloud_arr, stamp=None, frame_id=None):
-        # make it 2d (even if height will be 1)
-        cloud_arr = np.atleast_2d(cloud_arr)
-
-        cloud_msg = PointCloud2()
-
-        if stamp is not None:
-            cloud_msg.header.stamp = stamp
-        if frame_id is not None:
-            cloud_msg.header.frame_id = frame_id
-        cloud_msg.height = cloud_arr.shape[0]
-        cloud_msg.width = cloud_arr.shape[1]
-        cloud_msg.fields = self.dtype_to_fields(cloud_arr.dtype)
-        cloud_msg.is_bigendian = sys.byteorder != 'little'
-        cloud_msg.point_step = cloud_arr.dtype.itemsize
-        cloud_msg.row_step = cloud_msg.point_step*cloud_arr.shape[1]
-        cloud_msg.is_dense = \
-        all([np.isfinite(
-                cloud_arr[fname]).all() for fname in cloud_arr.dtype.names])
-
-        # The PointCloud2.data setter will create an array.array object for you if you don't
-        # provide it one directly. This causes very slow performance because it iterates
-        # over each byte in python.
-        # Here we create an array.array object using a memoryview, limiting copying and
-        # increasing performance.
-        memory_view = memoryview(cloud_arr)
-        if memory_view.nbytes > 0:
-            array_bytes = memory_view.cast("B")
-        else:
-            # Casting raises a TypeError if the array has no elements
-            array_bytes = b""
-        as_array = array.array("B")
-        as_array.frombytes(array_bytes)
-        cloud_msg.data = as_array
-        return cloud_msg
-
     '''
     Transformation from front_left_camera to luminar_front
     Translation: [-0.107, -0.146, 0.026]
@@ -191,6 +137,7 @@ class Lidar2Cam(Node):
     Rotation Matrix = [  0.5732029,  0.8194135,  0.0000000;
                         -0.8194135,  0.5732029,  0.0000000;
                         0.0000000,  0.0000000,  1.0000000 ]
+    Transformation from  luminar_front to camera
     - Translation: [-0.058, 0.171, -0.026]
     - Rotation: in Quaternion [0.000, 0.000, 0.462, 0.887]
     - Rotation Matrix = [  0.5732029, -0.8194135,  0.0000000;
@@ -202,23 +149,59 @@ class Lidar2Cam(Node):
         y1, y2, x1, x2 =  self.box_to_corners(self.box_msg.center.x, self.box_msg.center.y, self.box_msg.size_x, self.box_msg.size_y)
 
         # Lidar camera projection right here
-        ptc_gen = pc2.read_points(self.point_cloud_msg, field_names = ("x", "y", "z"), skip_nans=True)
-        ptc_numpy = np.array(next(ptc_gen).append(0)) # append the order stamp
-        ptc_numpy_c = self.RotMat_K @ ptc_numpy + self.translation_K # could we incorprate the camera matrix into the Rotation transformation
-
+        ptc_numpy_rec = pointcloud2_to_array(self.point_cloud_msg)
+        ptc_numpy = get_xyz_points(ptc_numpy_rec)
+        # ptc_numpy[:,[0,1,2]]*=-1
+        # Applying Rotation 
+        ptc_numpy=ptc_numpy[:,[1,2,0]] 
+        ptc_numpy[:, 0:2] = -ptc_numpy[:, 0:2]
+        
+        # ptc_numpy = np.array([p for p in pc2.read_points(self.point_cloud_msg, field_names = ("x", "y", "z"), skip_nans=False, uvs = [])])
+        # print(type(np.asarray(ptc_numpy)[0]))
+        # print(ptc_numpy.shape)
+        # print(self.RotMat_K)
+        ptc_numpy_c = self.camera_info @ ptc_numpy.T # + np.tile(self.translation_K.reshape((3, 1)), ptc_numpy.shape[0]) # could we incorprate the camera matrix into the Rotation transformation
+        # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+        # print(ptc_numpy_c.shape)
+        ptc_numpy_c = ptc_numpy_c.T
+        ptc_numpy_c*=[50,50,50]
+        # ptc_numpy_c+=[400,400,400]
         # Comparison with BBox
-        mask=ptc_numpy_c[:,0]>=x1&ptc_numpy_c[:,0]<=x2&ptc_numpy_c[:,1]>=y1&ptc_numpy_c[:,1]<=y2
-        ptc_numpy_l = ptc_numpy[mask]
-        filtered_msg = array_to_pointcloud2(ptc_numpy_l, stamp=None, frame_id="luminar_front")
+        # Redo this
+        print(ptc_numpy.shape,np.min(ptc_numpy,0),np.max(ptc_numpy,0))
+        print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+        # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+        # print(x1, x2, y1, y2)
+        # print(self.image_msg.width, self.image_msg.height)
+        # print(np.all((ptc_numpy_c[:,0]<=self.image_msg.width)&(ptc_numpy_c[:,1]<=self.image_msg.height)))
+        # print(size(np.where(ptc_numpy_c[:,0]>=self.image_msg.width)))
+        # print(image.shape)
+        # print(ptc_numpy_c[:,0])
+        print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+        mask=(ptc_numpy_c[:,0]>=x1)&(ptc_numpy_c[:,0]<=x2)&(ptc_numpy_c[:,1]>=y1)&(ptc_numpy_c[:,1]<=y2)
+        # ptc_numpy_c=ptc_numpy_c[(ptc_numpy_c[:,0]>=0)&(ptc_numpy_c[:,0]<=384)&(ptc_numpy_c[:,1]>=0)&(ptc_numpy_c[:,1]<=516)]
+        # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+        ptc_numpy_l = ptc_numpy_rec # Should already be in the right frame
+        # print(np.count_nonzero(mask))
+        # print(ptc_numpy_rec)
+        filtered_msg = array_to_pointcloud2(ptc_numpy_l, frame_id="luminar_front")
 
         # Labelling the Image for verification Purposes
-        image = self.img_tocv2(self.image_msg)
-        print(type(image))
-        for i in ptc_numpy_l:
-            image = cv2.circle(image, (i[0], i[1]), 1, (0, 0, 255), 1)
+        ptc_numpy_l_xyz = ptc_numpy[mask]
+        # print(ptc_numpy_l_xyz)
+        image = self.img_tocv2(self.image_msg) #(384, 516, 3)
+        border_size=1000
+        image=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+        # print(type(image))
+        # ptc_numpy_c=ptc_numpy_c[:,[0,2,1]]
+        for i in ptc_numpy_c:
+            # print(i)
+
+            image = cv2.circle(image, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 1)
+        # cv2.imshow(image)
         
         # Publishing the Image and PointCloud
-        self.image_pub.publish()
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
         self.cloud_pub.publish(filtered_msg)
 
         self.box_msg = None
@@ -582,9 +565,9 @@ def main(args=None):
     rclpy.init(args=args)
 
     minimal_subscriber = Lidar2Cam()
-
+    print("going to spin")
     rclpy.spin(minimal_subscriber)
-
+    print("destroying node")
     # Destroy the node explicitly
     minimal_subscriber.destroy_node()
     rclpy.shutdown()

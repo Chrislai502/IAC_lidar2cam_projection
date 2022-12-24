@@ -16,6 +16,10 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 # import ros2_numpy as rp
 from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, get_xyz_points
+import os
+import time
+print(os.getcwd())
+
 class Lidar2Cam(Node):
     def __init__(self):
         print("Initialized Lidar2Cam Node!")
@@ -23,34 +27,19 @@ class Lidar2Cam(Node):
         self.bridge = CvBridge()
         self.point_cloud_msg = None
         self.image_msg = None # Initialize an empty array
-        self.box_msg = None
 
         # Front Left Camera only
-        # self.camera_info     = np.array([[494.186152, 0.000000, 521.646677],
-        #                                 [0.000000, 494.988972, 389.133925],
-        #                                 [0.000000, 0.000000, 1.000000]])  
-        # self.camera_info     = np.array([[494.186152, 0.000000, 52.1*1],
-        #                                 [0.000000, 494.988972, 38.9*1],
-        #                                 [0.000000, 0.000000, 1]]) 
-        # self.camera_info     = np.array([[494.186152, 0.000000, 0],
-        #                                 [0.000000, 494.186152, 0],
-        #                                 [0.000000, 0.000000, 1]]) 
         self.camera_info = np.array([[1.732571708, 0.000000, 0.549797164], 
                                      [0.000000, 1.731274561, 0.295484988], 
                                      [0.000000, 0.000000, 1.000000]])
-        # self.camera_info_inv = np.linalg.inv(np.array([[494.186152, 0.000000, 521.646677],
-        #                                                 [0.000000, 494.988972, 389.133925],
-        #                                                 [0.000000, 0.000000, 1.000000]]))
-        # self.RotMat = np.array([[  0.5732029, 0.8194135,  0.0000000],
-        #                         [-0.8194135,  0.5732029,  0.0000000],
-        #                         [0.0000000,  0.0000000,  1.0000000] ])
-        # self.RotMat=np.identity(3)
-        # self.translation = np.array([0.007, -0.121, 0.026])*-1
-        # self.translation = np.array([0, 0, 0])
+        self.RotMat = np.array([[0.0, -1.0,  0.0],
+                                [0.0,  0.0, -1.0],
+                                [1.0,  0.0,  0.0]])
+        self.translation = np.array([0.007, -0.121, 0.026])*-1
 
-        # self.RotMat_K      = self.camera_info @ self.RotMat
-        # self.RotMat_K=np.identity(3)
-        # self.translation_K = self.camera_info @ self.translation
+        # Multiply the rotation Matrices by K
+        self.RotMat_K      = self.camera_info @ self.RotMat
+        self.translation_K = self.camera_info @ self.translation
 
         # -------------------------------- QOS Profile ------------------------------- #
         self.qos_profile =  QoSProfile(
@@ -69,59 +58,35 @@ class Lidar2Cam(Node):
         )
         self.pointcloud_sub  # prevent unused variable warning
 
-        # ------------------------------ Bounding Box Object---------------------------------- #
-        self.box_sub = self.create_subscription(
-            msg_type    = BoundingBox2D, # contain 4 coordinates and the centerpoint
-            topic       = 'vimba_front_left_center/out/objects',
-            callback    = self.box_callback,
-            qos_profile = self.qos_profile
-        )
-        self.box_sub # prevent unused variable warning
-
-        # ------------------------------  Labelled Image ---------------------------------- #
+        # ------------------------------  Unlabelled Image ---------------------------------- #
         self.image_sub = self.create_subscription(
             msg_type    = Image, 
-            topic       = '/vimba_front_left_center/out/image',
+            topic       = '/vimba_front_left_center/image',
             callback    = self.image_callback,
             qos_profile = self.qos_profile
         )
         self.image_sub # prevent unused variable warning
 
         # ------------------------------- Publishers ------------------------------ #
-        self.image_pub = self.create_publisher(Image , "/vimba_front_left_center/out/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
-        self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
-        
+        self.image_pub = self.create_publisher(Image , "/vimba_front_left_center/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
+        self.image_pub2 = self.create_publisher(Image , "/vimba_front_left_center/image_lidar_label2", rclpy.qos.qos_profile_sensor_data)
+        # self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
 
     def image_callback(self, msg):
         print("I")
         self.image_msg = msg
-
-    def box_callback(self, msg):
-        print("B")
-        self.box_msg = msg
         if self.point_cloud_msg is not None:
             print("+")
-            self.pair_box_point_cloud()
+            self.image_ptc_callback()
 
     def point_cloud_callback(self, msg):
         print("P")
         self.point_cloud_msg = msg
-        if self.box_msg is not None:
+        if self.image_msg is not None:
             print("+")
-            self.pair_box_point_cloud()
+            self.image_ptc_callback()
 
-    '''Helper functions'''
-    def box_to_corners(self, cx, cy, width, height):
-        half_width = width / 2
-        half_height = height / 2
-
-        y1 = cy - half_height # top
-        y2 = cy + half_height # bottom
-        x1 = cx - half_width # left
-        x2 = cx + half_width # right
-
-        return (y1, y2, x1, x2) #(up, down, left, right)
-
+    '''Helper Function'''
     def img_tocv2(self, message):
         try:
             # Convert the ROS2 Image message to a NumPy array
@@ -129,6 +94,342 @@ class Lidar2Cam(Node):
         except CvBridgeError as e:
             print(e)
         return image
+
+    ''' 
+    In the middle of debugging the LIDAR
+    '''
+    def image_ptc_callback(self):
+
+
+        # -------------------- Lidar camera projection right here -------------------- #
+        ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
+        ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)
+        numpoints = ptc_xyz_lidar.shape[0]
+        assert(ptc_xyz_lidar.shape[1] == 3), "PointCloud_lidar is not N x 3"
+        # np.save(os.path.join(os.getcwd(), "pointcloud_raw.txt"), ptc_numpy)
+        # np.savetxt(os.path.join(os.getcwd(), "pointcloud_raw.txt"), ptc_numpy, fmt="%d", delimiter=",")
+        print("Min Values:", np.min(ptc_xyz_lidar, axis=0))
+        print("Max Values: ", np.max(ptc_xyz_lidar, axis=0))
+
+
+        # --------------------------- Applying the Rotation -------------------------- # Alt + x
+        # ---------------------------------------------------------------------------- # Alt + Y
+        # ---------------------------------------------------------------------------- # Alt + shift + x
+        #                                      sdf                                     #
+        # ---------------------------------------------------------------------------- #
+        RotMat_luminar_front2_flc = np.array([[0.0, -1.0,  0.0],
+                                            [0.0,  0.0, -1.0],
+                                            [1.0,  0.0,  0.0]])
+        translation_luminar_front2_flc = np.array([0.121, -0.026, 0.007])
+        translation_luminar_front2_flc2 = np.array([0.121, -0.026, 0.007])*2
+        translation_luminar_front2_flc = np.tile(translation_luminar_front2_flc.reshape((3, 1)), numpoints)
+        assert(translation_luminar_front2_flc.shape == (3, numpoints)), "Translation is not 3 x N"
+        ptc_xyz_camera = RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_luminar_front2_flc # This is correct
+        ptc_xyz_camera = ptc_xyz_camera.T
+        assert(ptc_xyz_camera.shape == (numpoints, 3)), "PointCloud_camera is not N x 3"
+        print("\t")
+        print("R_Min Vals:", np.min(ptc_xyz_camera, axis=0))
+        print("R_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
+
+
+        # ------------------------- Applying the Camera Info ------------------------- #
+        camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
+                                [0.000000, 1731.274561, 295.484988], 
+                                [0.000000, 0.000000, 1.000000]])
+        ptc_xyz_camera = ptc_xyz_camera.T
+        ptc_xyz_camera = camera_info @ ptc_xyz_camera
+        ptc_xyz_camera = ptc_xyz_camera.T
+        print("\t")
+        print("First Point: ", ptc_xyz_camera[0])
+        print("K_NORM_RT_Min Vals:", np.min(ptc_xyz_camera, axis=0))
+        print("K_NORM_RT_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
+
+
+        # ------------------------------ Do the Division ----------------------------- #
+        ptc_z_camera = ptc_xyz_camera[:, 2]
+        ptc_xyz_camera = np.divide(ptc_xyz_camera, ptc_z_camera.reshape(ptc_xyz_camera.shape[0], 1))
+        print("\t")
+        print("First Point: ", ptc_xyz_camera[0])
+        print("NORM_RT_Min Vals:", np.min(ptc_xyz_camera, axis=0))
+        print("NORM_RT_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
+
+        # -------------------- Plotting everything into the Image -------------------- #
+        image = self.img_tocv2(self.image_msg) 
+        image_undistorted = cv2.undistort(image, camera_info, np.array([-0.272455, 0.268395, -0.005054, 0.000391, 0.000000]))
+        border_size=300
+        image_undistorted=cv2.copyMakeBorder(image_undistorted,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+        for i in ptc_xyz_camera:
+            image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
+            # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
+
+        # Publishing the Image and PointCloud
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
+        self.image_pub2.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
+        # self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
+        # self.cloud_pub.publish(filtered_msg)
+
+        # # Pause the code
+        # try:
+        #     # Start an infinite loop
+        #     while True:
+        #         # Sleep for one second
+        #         time.sleep(1)
+        # except KeyboardInterrupt:
+        #     # Handle the KeyboardInterrupt exception
+        #     print("Exiting loop")
+
+        self.image_msg = None
+        self.point_cloud_msg = None 
+
+        # ptc_numpy[:,[0,1,2]]*=-1
+        # Applying Rotation 
+        # ptc_numpy=ptc_numpy[:,[1,2,0]] 
+        # ptc_numpy[:, 0:2] = -ptc_numpy[:, 0:2]
+        
+        # ptc_numpy_c = self.camera_info @ ptc_numpy.T + np.tile(self.translation_K.reshape((3, 1)), ptc_numpy.shape[0]) # could we incorprate the camera matrix into the Rotation transformation
+        # # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+        # ptc_numpy_c = ptc_numpy_c.T
+        # # Redo this
+        # # ptc_numpy_c=ptc_numpy_c[(ptc_numpy_c[:,0]>=0)&(ptc_numpy_c[:,0]<=384)&(ptc_numpy_c[:,1]>=0)&(ptc_numpy_c[:,1]<=516)]
+        # # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+        # ptc_numpy_l = ptc_numpy_rec # Should already be in the right frame
+        # filtered_msg = array_to_pointcloud2(ptc_numpy_l, frame_id="luminar_front")
+
+        # # Labelling the Image for verification Purposes
+        # ptc_numpy_l_xyz = ptc_numpy[mask]
+        # # print(ptc_numpy_l_xyz)
+        # image = self.img_tocv2(self.image_msg) #(384, 516, 3)
+        # border_size=300
+        # image=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+        # # print(type(image))
+        # # ptc_numpy_c=ptc_numpy_c[:,[0,2,1]]
+        # for i in ptc_numpy_c:
+        #     # print(i)
+
+        #     image = cv2.circle(image, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 1)
+        # # cv2.imshow(image)
+        
+        # # Publishing the Image and PointCloud
+        # self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
+        # self.cloud_pub.publish(filtered_msg)
+
+        # self.box_msg = None
+        # self.point_cloud_msg = None 
+
+
+# class Lidar2Cam(Node):
+#     def __init__(self):
+#         print("Initialized Lidar2Cam Node!")
+#         super().__init__('lidar_to_cam_node')
+#         self.bridge = CvBridge()
+#         self.point_cloud_msg = None
+#         self.image_msg = None # Initialize an empty array
+#         self.box_msg = None
+
+#         # Front Left Camera only
+#         # self.camera_info     = np.array([[494.186152, 0.000000, 521.646677],
+#         #                                 [0.000000, 494.988972, 389.133925],
+#         #                                 [0.000000, 0.000000, 1.000000]])  
+#         # self.camera_info     = np.array([[494.186152, 0.000000, 52.1*1],
+#         #                                 [0.000000, 494.988972, 38.9*1],
+#         #                                 [0.000000, 0.000000, 1]]) 
+#         # self.camera_info     = np.array([[494.186152, 0.000000, 0],
+#         #                                 [0.000000, 494.186152, 0],
+#         #                                 [0.000000, 0.000000, 1]]) 
+#         self.camera_info = np.array([[1.732571708, 0.000000, 0.549797164], 
+#                                      [0.000000, 1.731274561, 0.295484988], 
+#                                      [0.000000, 0.000000, 1.000000]])
+#         # self.camera_info_inv = np.linalg.inv(np.array([[494.186152, 0.000000, 521.646677],
+#         #                                                 [0.000000, 494.988972, 389.133925],
+#         #                                                 [0.000000, 0.000000, 1.000000]]))
+#         # self.RotMat = np.array([[  0.5732029, 0.8194135,  0.0000000],
+#         #                         [-0.8194135,  0.5732029,  0.0000000],
+#         #                         [0.0000000,  0.0000000,  1.0000000] ])
+#         self.RotMat = np.array([[0.0, -1.0,  0.0],
+#                                 [0.0,  0.0, -1.0],
+#                                 [1.0,  0.0,  0.0]])
+#         # self.RotMat=np.identity(3)
+#         self.translation = np.array([0.007, -0.121, 0.026])*-1
+#         # self.translation = np.array([0, 0, 0])
+
+#         self.RotMat_K      = self.camera_info @ self.RotMat
+#         # self.RotMat_K=np.identity(3)
+#         self.translation_K = self.camera_info @ self.translation
+
+#         # -------------------------------- QOS Profile ------------------------------- #
+#         self.qos_profile =  QoSProfile(
+#             reliability=QoSReliabilityPolicy.BEST_EFFORT,
+#             history=QoSHistoryPolicy.KEEP_LAST,
+#             depth=1,
+#         )
+
+#         # ------------------------------- Subscriptions ------------------------------ #
+#         # ----------------------------------- LIDAR ---------------------------------- #
+#         self.pointcloud_sub = self.create_subscription(
+#             msg_type    = PointCloud2,
+#             topic       = '/luminar_front_points',
+#             callback    = self.point_cloud_callback,
+#             qos_profile = self.qos_profile
+#         )
+#         self.pointcloud_sub  # prevent unused variable warning
+
+#         # # ------------------------------ Bounding Box Object---------------------------------- #
+#         # self.box_sub = self.create_subscription(
+#         #     msg_type    = BoundingBox2D, # contain 4 coordinates and the centerpoint
+#         #     topic       = 'vimba_front_left_center/out/objects',
+#         #     callback    = self.box_callback,
+#         #     qos_profile = self.qos_profile
+#         # )
+#         # self.box_sub # prevent unused variable warning
+
+#         # # ------------------------------  Labelled Image ---------------------------------- #
+#         # self.image_sub = self.create_subscription(
+#         #     msg_type    = Image, 
+#         #     topic       = '/vimba_front_left_center/out/image',
+#         #     callback    = self.image_callback,
+#         #     qos_profile = self.qos_profile
+#         # )
+#         # self.image_sub # prevent unused variable warning
+
+#         # ------------------------------  Unlabelled Image ---------------------------------- #
+#         self.image_sub = self.create_subscription(
+#             msg_type    = Image, 
+#             topic       = '/vimba_front_left_center/image',
+#             callback    = self.image_callback,
+#             qos_profile = self.qos_profile
+#         )
+#         self.image_sub # prevent unused variable warning
+
+#         # ------------------------------- Publishers ------------------------------ #
+#         self.image_pub = self.create_publisher(Image , "/vimba_front_left_center/out/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
+#         self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
+
+#     def image_callback(self, msg):
+#         print("I")
+#         self.point_cloud_msg = msg
+#         if self.box_msg is not None:
+#             print("+")
+#             self.image_ptc_callback()
+
+#     def point_cloud_callback(self, msg):
+#         print("P")
+#         self.point_cloud_msg = msg
+#         if self.box_msg is not None:
+#             print("+")
+#             self.image_ptc_callback()
+
+#     '''Helper Function'''
+#     def img_tocv2(self, message):
+#         try:
+#             # Convert the ROS2 Image message to a NumPy array
+#             image = self.bridge.imgmsg_to_cv2(message, "bgr8")
+#         except CvBridgeError as e:
+#             print(e)
+#         return image
+
+#     ''' 
+#     In the middle of debugging the LIDAR
+#     '''
+#     def image_ptc_callback(self):
+#         # Lidar camera projection right here
+#         ptc_numpy_rec = pointcloud2_to_array(self.point_cloud_msg)
+#         ptc_numpy = get_xyz_points(ptc_numpy_rec)
+#         # ptc_numpy[:,[0,1,2]]*=-1
+#         # Applying Rotation 
+#         # ptc_numpy=ptc_numpy[:,[1,2,0]] 
+#         # ptc_numpy[:, 0:2] = -ptc_numpy[:, 0:2]
+        
+#         # ptc_numpy = np.array([p for p in pc2.read_points(self.point_cloud_msg, field_names = ("x", "y", "z"), skip_nans=False, uvs = [])])
+#         # print(type(np.asarray(ptc_numpy)[0]))
+#         # print(ptc_numpy.shape)
+#         # print(self.RotMat_K)
+#         ptc_numpy_c = self.camera_info @ ptc_numpy.T + np.tile(self.translation_K.reshape((3, 1)), ptc_numpy.shape[0]) # could we incorprate the camera matrix into the Rotation transformation
+#         # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+#         # print(ptc_numpy_c.shape)
+#         ptc_numpy_c = ptc_numpy_c.T
+#         # ptc_numpy_c*=[50,50,50]
+#         # ptc_numpy_c+=[400,400,400]
+#         # Comparison with BBox
+#         # Redo this
+#         # print(ptc_numpy.shape,np.min(ptc_numpy,0),np.max(ptc_numpy,0))
+#         # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+#         # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+#         # print(x1, x2, y1, y2)
+#         # print(self.image_msg.width, self.image_msg.height)
+#         # print(np.all((ptc_numpy_c[:,0]<=self.image_msg.width)&(ptc_numpy_c[:,1]<=self.image_msg.height)))
+#         # print(size(np.where(ptc_numpy_c[:,0]>=self.image_msg.width)))
+#         # print(image.shape)
+#         # print(ptc_numpy_c[:,0])
+#         # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+#         mask=(ptc_numpy_c[:,0]>=x1)&(ptc_numpy_c[:,0]<=x2)&(ptc_numpy_c[:,1]>=y1)&(ptc_numpy_c[:,1]<=y2)
+#         # ptc_numpy_c=ptc_numpy_c[(ptc_numpy_c[:,0]>=0)&(ptc_numpy_c[:,0]<=384)&(ptc_numpy_c[:,1]>=0)&(ptc_numpy_c[:,1]<=516)]
+#         # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+#         ptc_numpy_l = ptc_numpy_rec # Should already be in the right frame
+#         # print(np.count_nonzero(mask))
+#         # print(ptc_numpy_rec)
+#         filtered_msg = array_to_pointcloud2(ptc_numpy_l, frame_id="luminar_front")
+
+#         # Labelling the Image for verification Purposes
+#         ptc_numpy_l_xyz = ptc_numpy[mask]
+#         # print(ptc_numpy_l_xyz)
+#         image = self.img_tocv2(self.image_msg) #(384, 516, 3)
+#         border_size=300
+#         image=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+#         # print(type(image))
+#         # ptc_numpy_c=ptc_numpy_c[:,[0,2,1]]
+#         for i in ptc_numpy_c:
+#             # print(i)
+
+#             image = cv2.circle(image, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 1)
+#         # cv2.imshow(image)
+        
+#         # Publishing the Image and PointCloud
+#         self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
+#         self.cloud_pub.publish(filtered_msg)
+
+#         self.box_msg = None
+#         self.point_cloud_msg = None 
+
+    # def image_callback(self, msg):
+    #     print("I")
+    #     self.image_msg = msg
+
+    # def box_callback(self, msg):
+    #     print("B")
+    #     self.box_msg = msg
+    #     if self.point_cloud_msg is not None:
+    #         print("+")
+    #         self.pair_box_point_cloud()
+
+    # def point_cloud_callback(self, msg):
+    #     print("P")
+    #     self.point_cloud_msg = msg
+    #     if self.box_msg is not None:
+    #         print("+")
+    #         self.pair_box_point_cloud()
+
+    # '''Helper functions'''
+    # def box_to_corners(self, cx, cy, width, height):
+    #     half_width = width / 2
+    #     half_height = height / 2
+
+    #     y1 = cy - half_height # top
+    #     y2 = cy + half_height # bottom
+    #     x1 = cx - half_width # left
+    #     x2 = cx + half_width # right
+
+    #     return (y1, y2, x1, x2) #(up, down, left, right)
+
+    # def img_tocv2(self, message):
+    #     try:
+    #         # Convert the ROS2 Image message to a NumPy array
+    #         image = self.bridge.imgmsg_to_cv2(message, "bgr8")
+    #     except CvBridgeError as e:
+    #         print(e)
+    #     return image
+
+
+
 
     '''
     Transformation from front_left_camera to luminar_front
@@ -144,68 +445,69 @@ class Lidar2Cam(Node):
                         0.8194135,  0.5732029,  0.0000000;
                         0.0000000,  0.0000000,  1.0000000 ]
     '''
-    def pair_box_point_cloud(self):
-        # Box to homogeneous coords
-        y1, y2, x1, x2 =  self.box_to_corners(self.box_msg.center.x, self.box_msg.center.y, self.box_msg.size_x, self.box_msg.size_y)
 
-        # Lidar camera projection right here
-        ptc_numpy_rec = pointcloud2_to_array(self.point_cloud_msg)
-        ptc_numpy = get_xyz_points(ptc_numpy_rec)
-        # ptc_numpy[:,[0,1,2]]*=-1
-        # Applying Rotation 
-        ptc_numpy=ptc_numpy[:,[1,2,0]] 
-        ptc_numpy[:, 0:2] = -ptc_numpy[:, 0:2]
+    # def pair_box_point_cloud(self):
+    #     # Box to homogeneous coords
+    #     y1, y2, x1, x2 =  self.box_to_corners(self.box_msg.center.x, self.box_msg.center.y, self.box_msg.size_x, self.box_msg.size_y)
+
+    #     # Lidar camera projection right here
+    #     ptc_numpy_rec = pointcloud2_to_array(self.point_cloud_msg)
+    #     ptc_numpy = get_xyz_points(ptc_numpy_rec)
+    #     # ptc_numpy[:,[0,1,2]]*=-1
+    #     # Applying Rotation 
+    #     # ptc_numpy=ptc_numpy[:,[1,2,0]] 
+    #     # ptc_numpy[:, 0:2] = -ptc_numpy[:, 0:2]
         
-        # ptc_numpy = np.array([p for p in pc2.read_points(self.point_cloud_msg, field_names = ("x", "y", "z"), skip_nans=False, uvs = [])])
-        # print(type(np.asarray(ptc_numpy)[0]))
-        # print(ptc_numpy.shape)
-        # print(self.RotMat_K)
-        ptc_numpy_c = self.camera_info @ ptc_numpy.T # + np.tile(self.translation_K.reshape((3, 1)), ptc_numpy.shape[0]) # could we incorprate the camera matrix into the Rotation transformation
-        # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
-        # print(ptc_numpy_c.shape)
-        ptc_numpy_c = ptc_numpy_c.T
-        ptc_numpy_c*=[50,50,50]
-        # ptc_numpy_c+=[400,400,400]
-        # Comparison with BBox
-        # Redo this
-        print(ptc_numpy.shape,np.min(ptc_numpy,0),np.max(ptc_numpy,0))
-        print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
-        # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
-        # print(x1, x2, y1, y2)
-        # print(self.image_msg.width, self.image_msg.height)
-        # print(np.all((ptc_numpy_c[:,0]<=self.image_msg.width)&(ptc_numpy_c[:,1]<=self.image_msg.height)))
-        # print(size(np.where(ptc_numpy_c[:,0]>=self.image_msg.width)))
-        # print(image.shape)
-        # print(ptc_numpy_c[:,0])
-        print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
-        mask=(ptc_numpy_c[:,0]>=x1)&(ptc_numpy_c[:,0]<=x2)&(ptc_numpy_c[:,1]>=y1)&(ptc_numpy_c[:,1]<=y2)
-        # ptc_numpy_c=ptc_numpy_c[(ptc_numpy_c[:,0]>=0)&(ptc_numpy_c[:,0]<=384)&(ptc_numpy_c[:,1]>=0)&(ptc_numpy_c[:,1]<=516)]
-        # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
-        ptc_numpy_l = ptc_numpy_rec # Should already be in the right frame
-        # print(np.count_nonzero(mask))
-        # print(ptc_numpy_rec)
-        filtered_msg = array_to_pointcloud2(ptc_numpy_l, frame_id="luminar_front")
+    #     # ptc_numpy = np.array([p for p in pc2.read_points(self.point_cloud_msg, field_names = ("x", "y", "z"), skip_nans=False, uvs = [])])
+    #     # print(type(np.asarray(ptc_numpy)[0]))
+    #     # print(ptc_numpy.shape)
+    #     # print(self.RotMat_K)
+    #     ptc_numpy_c = self.camera_info @ ptc_numpy.T + np.tile(self.translation_K.reshape((3, 1)), ptc_numpy.shape[0]) # could we incorprate the camera matrix into the Rotation transformation
+    #     # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+    #     # print(ptc_numpy_c.shape)
+    #     ptc_numpy_c = ptc_numpy_c.T
+    #     # ptc_numpy_c*=[50,50,50]
+    #     # ptc_numpy_c+=[400,400,400]
+    #     # Comparison with BBox
+    #     # Redo this
+    #     # print(ptc_numpy.shape,np.min(ptc_numpy,0),np.max(ptc_numpy,0))
+    #     # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+    #     # ptc_numpy_c = np.divide(ptc_numpy_c[:, :2], ptc_numpy_c[:, 2:3])
+    #     # print(x1, x2, y1, y2)
+    #     # print(self.image_msg.width, self.image_msg.height)
+    #     # print(np.all((ptc_numpy_c[:,0]<=self.image_msg.width)&(ptc_numpy_c[:,1]<=self.image_msg.height)))
+    #     # print(size(np.where(ptc_numpy_c[:,0]>=self.image_msg.width)))
+    #     # print(image.shape)
+    #     # print(ptc_numpy_c[:,0])
+    #     # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+    #     mask=(ptc_numpy_c[:,0]>=x1)&(ptc_numpy_c[:,0]<=x2)&(ptc_numpy_c[:,1]>=y1)&(ptc_numpy_c[:,1]<=y2)
+    #     # ptc_numpy_c=ptc_numpy_c[(ptc_numpy_c[:,0]>=0)&(ptc_numpy_c[:,0]<=384)&(ptc_numpy_c[:,1]>=0)&(ptc_numpy_c[:,1]<=516)]
+    #     # print(ptc_numpy_c.shape,np.min(ptc_numpy_c,0),np.max(ptc_numpy_c,0))
+    #     ptc_numpy_l = ptc_numpy_rec # Should already be in the right frame
+    #     # print(np.count_nonzero(mask))
+    #     # print(ptc_numpy_rec)
+    #     filtered_msg = array_to_pointcloud2(ptc_numpy_l, frame_id="luminar_front")
 
-        # Labelling the Image for verification Purposes
-        ptc_numpy_l_xyz = ptc_numpy[mask]
-        # print(ptc_numpy_l_xyz)
-        image = self.img_tocv2(self.image_msg) #(384, 516, 3)
-        border_size=1000
-        image=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
-        # print(type(image))
-        # ptc_numpy_c=ptc_numpy_c[:,[0,2,1]]
-        for i in ptc_numpy_c:
-            # print(i)
+    #     # Labelling the Image for verification Purposes
+    #     ptc_numpy_l_xyz = ptc_numpy[mask]
+    #     # print(ptc_numpy_l_xyz)
+    #     image = self.img_tocv2(self.image_msg) #(384, 516, 3)
+    #     border_size=300
+    #     image=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+    #     # print(type(image))
+    #     # ptc_numpy_c=ptc_numpy_c[:,[0,2,1]]
+    #     for i in ptc_numpy_c:
+    #         # print(i)
 
-            image = cv2.circle(image, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 1)
-        # cv2.imshow(image)
+    #         image = cv2.circle(image, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 1)
+    #     # cv2.imshow(image)
         
-        # Publishing the Image and PointCloud
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
-        self.cloud_pub.publish(filtered_msg)
+    #     # Publishing the Image and PointCloud
+    #     self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
+    #     self.cloud_pub.publish(filtered_msg)
 
-        self.box_msg = None
-        self.point_cloud_msg = None
+    #     self.box_msg = None
+    #     self.point_cloud_msg = None
             
 
 

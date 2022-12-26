@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'lidarchris_node = lidar_camera_projection.lidarchris_node:main'
+            'lidar_cam_node = lidar_camera_projection.lidarchris_node:main'
         ],
     },
 )

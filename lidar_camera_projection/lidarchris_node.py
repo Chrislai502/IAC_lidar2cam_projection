@@ -26,16 +26,26 @@ class Lidar2Cam(Node):
         super().__init__('lidar_to_cam_node')
         self.bridge = CvBridge()
         self.point_cloud_msg = None
-        self.image_msg = None # Initialize an empty array
+        self.bbox_msg = None # Initialize an empty array
 
         # Front Left Camera only
-        self.camera_info = np.array([[1.732571708, 0.000000, 0.549797164], 
-                                     [0.000000, 1.731274561, 0.295484988], 
-                                     [0.000000, 0.000000, 1.000000]])
-        self.RotMat = np.array([[0.0, -1.0,  0.0],
-                                [0.0,  0.0, -1.0],
-                                [1.0,  0.0,  0.0]])
-        self.translation = np.array([0.007, -0.121, 0.026])*-1
+        self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
+                                     [0.000000, 1731.274561, 295.484988], 
+                                     [0.000000, 0.000000, 1.000000*2]])*0.5
+        print(self.camera_info)
+
+        # self.RotMat = np.array([[0.0, -1.0,  0.0],
+        #                         [0.0,  0.0, -1.0],
+        #                         [1.0,  0.0,  0.0]])
+        # self.translation = np.array([0.007, -0.121, 0.026])*-1
+
+        # ---------------------------------------------------------------------------- #
+        #                      Calibrated Transformation Matrices                      #
+        # ---------------------------------------------------------------------------- #
+        self.translation = np.array([ 0.01585027 -0.15477238  0.02598614])
+        self.RotMat = np.array([[ 0.02135093 -0.99976672 -0.00326259]
+                                [ 0.05990699  0.00453683 -0.99819365]
+                                [ 0.9979756   0.02111691  0.05998988]])
 
         # Multiply the rotation Matrices by K
         self.RotMat_K      = self.camera_info @ self.RotMat
@@ -58,32 +68,32 @@ class Lidar2Cam(Node):
         )
         self.pointcloud_sub  # prevent unused variable warning
 
-        # ------------------------------  Unlabelled Image ---------------------------------- #
+        # ------------------------------  Bounding Box ---------------------------------- #
         self.image_sub = self.create_subscription(
-            msg_type    = Image, 
-            topic       = '/vimba_front_left_center/image',
-            callback    = self.image_callback,
+            msg_type    = BoundingBox2D, 
+            topic       = 'vimba_front_left_center/out/objects',
+            callback    = self.bbox_callback,
             qos_profile = self.qos_profile
         )
         self.image_sub # prevent unused variable warning
 
         # ------------------------------- Publishers ------------------------------ #
         self.image_pub = self.create_publisher(Image , "/vimba_front_left_center/image_lidar_label", rclpy.qos.qos_profile_sensor_data)
-        # self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
+        self.cloud_pub = self.create_publisher(PointCloud2, "/luminar_front_points/points_filtered", rclpy.qos.qos_profile_sensor_data)
 
-    def image_callback(self, msg):
-        print("I")
-        self.image_msg = msg
+    def bbox_callback(self, msg):
+        print("B")
+        self.bbox_msg = msg
         if self.point_cloud_msg is not None:
             print("+")
-            self.image_ptc_callback()
+            self.bbox_ptc_callback()
 
     def point_cloud_callback(self, msg):
         print("P")
         self.point_cloud_msg = msg
-        if self.image_msg is not None:
+        if self.bbox_msg is not None:
             print("+")
-            self.image_ptc_callback()
+            self.bbox_ptc_callback()
 
     '''Helper Function'''
     def img_tocv2(self, message):
@@ -94,10 +104,21 @@ class Lidar2Cam(Node):
             print(e)
         return image
 
+    def box_to_corners(self, cx, cy, width, height):
+        half_width = width / 2
+        half_height = height / 2
+
+        y1 = cy - half_height # top
+        y2 = cy + half_height # bottom
+        x1 = cx - half_width # left
+        x2 = cx + half_width # right
+
+        return (y1, y2, x1, x2) #(up, down, left, right)
+
     ''' 
     In the middle of debugging the LIDAR
     '''
-    def image_ptc_callback(self):
+    def bbox_ptc_callback(self):
 
 
         # -------------------- Lidar camera projection right here -------------------- #
@@ -105,12 +126,8 @@ class Lidar2Cam(Node):
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)
         numpoints = ptc_xyz_lidar.shape[0]
         assert(ptc_xyz_lidar.shape[1] == 3), "PointCloud_lidar is not N x 3"
-        # np.save(os.path.join(os.getcwd(), "pointcloud_raw.txt"), ptc_numpy)
-        # np.savetxt(os.path.join(os.getcwd(), "pointcloud_raw.txt"), ptc_numpy, fmt="%d", delimiter=",")
         print("Min Values:", np.min(ptc_xyz_lidar, axis=0))
         print("Max Values: ", np.max(ptc_xyz_lidar, axis=0))
-
-
 
         # --------------------------- Applying the Rotation -------------------------- # Alt + x
         # ---------------------------------------------------------------------------- # Alt + Y
@@ -135,6 +152,9 @@ class Lidar2Cam(Node):
         camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
                                 [0.000000, 1731.274561, 295.484988], 
                                 [0.000000, 0.000000, 1.000000]])
+        camera_info = np.array([[1732.571708*0.5, 0.000000, 549.797164*0.5], 
+                            [0.000000, 1731.274561*0.5, 295.484988*0.5], 
+                            [0.000000, 0.000000, 1.000000]])
         ptc_xyz_camera = ptc_xyz_camera.T
         ptc_xyz_camera = camera_info @ ptc_xyz_camera
         ptc_xyz_camera = ptc_xyz_camera.T
@@ -152,20 +172,28 @@ class Lidar2Cam(Node):
         print("NORM_RT_Min Vals:", np.min(ptc_xyz_camera, axis=0))
         print("NORM_RT_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
 
+        # ---------------------------------------------------------------------------- #
+        #                    Point Comparison with BBox happens here                   #
+        # ---------------------------------------------------------------------------- #
+        y1, y2, x1, x2 = self.box_to_corners(self.bbox_msg.center.x, self.bbox_msg.center.y, self.bbox_msg.size_x, self.bbox_msg.size_y)
+        mask=ptc_xyz_camera[:,0]>=x1&ptc_xyz_camera[:,0]<=x2&ptc_xyz_camera[:,1]>=y1&ptc_xyz_camera[:,1]<=y2
+        ptc_numpy_record_filtered = ptc_numpy_record[mask]
+        ptc_numpy_record_filtered_msg = array_to_pointcloud2(ptc_numpy_record_filtered, stamp=None, frame_id="luminar_front")
+
         # -------------------- Plotting everything into the Image -------------------- #
-        image = self.img_tocv2(self.image_msg) 
+        # image = self.img_tocv2(self.image_msg) 
         # print("image_width, height:", image.shape)
-        image_undistorted = cv2.undistort(image, camera_info, np.array([-0.272455, 0.268395, -0.005054, 0.000391, 0.000000]))
-        border_size=300
-        image_undistorted=cv2.copyMakeBorder(image_undistorted,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
-        for i in ptc_xyz_camera:
-            image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
+        # image_undistorted = cv2.undistort(image, camera_info, np.array([-0.272455, 0.268395, -0.005054, 0.000391, 0.000000]))
+        # border_size=300
+        # image_undistorted=cv2.copyMakeBorder(image_undistorted,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+        # for i in ptc_xyz_camera:
+        #     image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
             # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
 
         # Publishing the Image and PointCloud
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
+        # self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
         # self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
-        # self.cloud_pub.publish(filtered_msg)
+        self.cloud_pub.publish(filteredptc_numpy_record_filtered_msg_msg)
 
         # # Pause the code
         # try:

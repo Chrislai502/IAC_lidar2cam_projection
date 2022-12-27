@@ -128,14 +128,12 @@ class Lidar2Cam(Node):
     '''
     def bbox_ptc_callback(self):
 
-
         # -------------------- Lidar camera projection right here -------------------- #
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)
         numpoints = ptc_xyz_lidar.shape[0]
         assert(ptc_xyz_lidar.shape[1] == 3), "PointCloud_lidar is not N x 3"
-        print("Min Values:", np.min(ptc_xyz_lidar, axis=0))
-        print("Max Values: ", np.max(ptc_xyz_lidar, axis=0))
+   
 
         # --------------------------- Applying the Rotation -------------------------- # Alt + x
         # ---------------------------------------------------------------------------- # Alt + Y
@@ -147,25 +145,12 @@ class Lidar2Cam(Node):
         ptc_xyz_camera = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_luminar_front2_flc # This is correct
         ptc_xyz_camera = ptc_xyz_camera.T
         assert(ptc_xyz_camera.shape == (numpoints, 3)), "PointCloud_camera is not N x 3"
-        print("\t")
-        print("R_Min Vals:", np.min(ptc_xyz_camera, axis=0))
-        print("R_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
 
 
         # ------------------------- Applying the Camera Info ------------------------- #
-        # camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
-        #                         [0.000000, 1731.274561, 295.484988], 
-        #                         [0.000000, 0.000000, 1.000000]])
-        # camera_info = np.array([[1732.571708*0.5, 0.000000, 549.797164*0.5], 
-        #                     [0.000000, 1731.274561*0.5, 295.484988*0.5], 
-        #                     [0.000000, 0.000000, 1.000000]])
         ptc_xyz_camera = ptc_xyz_camera.T
         ptc_xyz_camera = self.camera_info @ ptc_xyz_camera
         ptc_xyz_camera = ptc_xyz_camera.T
-        print("\t")
-        print("First Point: ", ptc_xyz_camera[0])
-        print("K_NORM_RT_Min Vals:", np.min(ptc_xyz_camera, axis=0))
-        print("K_NORM_RT_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
 
 
         # ------------------------------ Do the Division ----------------------------- #
@@ -179,8 +164,44 @@ class Lidar2Cam(Node):
         # ---------------------------------------------------------------------------- #
         #                    Point Comparison with BBox happens here                   #
         # ---------------------------------------------------------------------------- #
+        
+        # ------------------- Convert the message to bounds ------------------ #
         y1, y2, x1, x2 = self.box_to_corners(self.bbox_msg.center.x, self.bbox_msg.center.y, self.bbox_msg.size_x, self.bbox_msg.size_y)
+        
+        # ----- Applying first detection strategy to cut off top 40% of the bbox ----- #
+        y1 = y1 + int(0.4 * self.bbox_msg.size_y)
         mask=(ptc_xyz_camera[:,0]>=x1)&(ptc_xyz_camera[:,0]<=x2)&(ptc_xyz_camera[:,1]>=y1)&(ptc_xyz_camera[:,1]<=y2)
+        
+        # ------ Applying 2nd strategy to remove outliers, and select the median within 10~30th percentile----- #
+        # ------- Idea: Get the correct distance of the car from our car first, ------ #
+        # ---- in spherical coordinates and then decide where to place the marker ---- #
+        # ------- (in terms of theta/ x, y,z) What shape of the object needed? ------- #
+        ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
+        
+        # Converting the Markers from XYZ Coordinates to Spherical coordinares
+
+        # Select the last column
+        values = ptc_xyz_camera[:, 2]
+
+        # Calculate the 10th and 40th percentiles
+        p10 = np.percentile(values, 10)
+        p30 = np.percentile(values, 30)
+
+        # Use a boolean mask to filter the points that lie outside the 10th to 40th percentile
+        mask = (values < p10) | (values > p30)
+        filtered_points = ptc_xyz_camera[mask]
+
+        # Calculate the median of the filtered points
+        median = np.median(filtered_points[:, 2])
+
+        # Find the indices of the rows where the element with the median value occurs
+        indices = np.argwhere(filtered_points[:, 2] == median)
+        print(indices)
+
+        # Index into the original array using the indices and return the corresponding rows
+        median_rows = filtered_points[indices]
+
+        # ---- Applying 3rd strategy, take 10th to 40th percentile's median value ---- #
         ptc_numpy_record_filtered = ptc_numpy_record[mask]
         print("ptc_numpy_record_filtered: ", ptc_numpy_record_filtered.shape)
         ptc_numpy_record_filtered_msg = array_to_pointcloud2(ptc_numpy_record_filtered, stamp=None, frame_id="luminar_front")
@@ -189,7 +210,11 @@ class Lidar2Cam(Node):
         image = self.img_tocv2(self.img_msg) 
         # print("image_width, height:", image.shape)
         # image = cv2.undistort(image, self.camera_info, np.array([-0.272455, 0.268395, -0.005054, 0.000391, 0.000000]))
-        # ptc_xyz_camera = ptc_xyz_camera[mask]
+        ptc_xyz_camera = ptc_xyz_camera[mask]
+        
+        # Doing Simple Data Processing to get the location where Marker will be placed
+
+        
         border_size=300
         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
 
@@ -217,7 +242,6 @@ class Lidar2Cam(Node):
 
         # Publishing the Image and PointCloud
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
-        # self.image_pub.publish(self.bridge.cv2_to_imgmsg(image[:2*border_size,:2*border_size]))
         self.cloud_pub.publish(ptc_numpy_record_filtered_msg)
 
         # # Pause the code

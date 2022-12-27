@@ -38,9 +38,9 @@ class Lidar2Cam(Node):
         # ---------------------------------------------------------------------------- #
         #                      Calibrated Transformation Matrices                      #
         # ---------------------------------------------------------------------------- #
-        self.translation_luminar_front2_flc = np.array([ 0.01585027, -0.15477238,  0.02598614])
-        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259], 
-                                                    [ 0.05990699,  0.00453683, -0.99819365], 
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156])
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
                                                     [ 0.9979756,   0.02111691,  0.05998988]])
 
         # # Multiply the rotation Matrices by K

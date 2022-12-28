@@ -130,15 +130,42 @@ class Lidar2Cam(Node):
     # Output points are in degrees
     def xyz2spherical(self, ptc_arr):
         def cartesian_to_spherical(xyz):
-            x, y, z = xyz # in camera frame(OpenCV coordinates)
-            # print(math.acos(x/z))
+            x, y, z = xyz # in camera frame
             rho   = math.sqrt(x**2 + y**2 + z**2)
-            phi   = math.acos(max(-1, min(x/z, 1))) # for z-y axis
-            theta = math.acos(max(-1, min(z/rho, 1))) # for x-y axis
+            r     = math.sqrt(x**2 + y**2)
+            
+            # Determine theta
+            if z>0:
+                theta = math.atan(r/z)
+            elif z<0:
+                    theta = math.pi + math.atan(r/z)
+            elif z==0 and x!=0 and y!=0:
+                    theta = math.pi/2
+            elif x==0 and y==0 and z==0:
+                    theta = None
+            else:
+                    theta = math.acos(z/rho)
+            
+            # Determine Phi
+            if x>0:
+                phi = math.atan(y/x)
+            elif x<0 and y>=0:
+                phi = math.atan(y/x)
+            elif x<0 and y<0:
+                phi = math.atan(y/x) - math.pi
+            elif x==0 and y>0:
+                phi = math.pi
+            elif x<0 and y<0:
+                phi = math.pi
+            elif x == 0 and y == 0:
+                phi = None
+            else:
+                phi = (0 if y==0 else 1 if x > 0 else -1)*math.acos(x/r)
+
             return [phi, theta, rho]
 
         # Apply Spherical Conversion on each point
-        return np.array(list(map(lambda x: cartesian_to_spherical(x), ptc_arr)))
+        return list(map(lambda x: cartesian_to_spherical(x), ptc_arr))
 
     # --------------- Converts Spherical Coordinates to Pointcloud in Camera Frame -------------- #
     def spherical2xyz(self, spr_arr):
@@ -149,7 +176,8 @@ class Lidar2Cam(Node):
             z = rho * math.cos(theta)
             return [x, y, z]
         # Apply Cartesian Conversion on each point
-        return np.array(list(map(lambda x: spherical_to_cartesian(x), spr_arr)))
+        return list(map(lambda x: spherical_to_cartesian(x), spr_arr))
+    
     
     # ---- Converts bbox coordinate format from (centerpoint, size_x, size_y) ---- #
     # ------------------- to (top_y, bottom_y, left_x, right_x) ------------------ #

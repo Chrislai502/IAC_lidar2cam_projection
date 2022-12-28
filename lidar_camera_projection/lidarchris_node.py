@@ -138,13 +138,13 @@ class Lidar2Cam(Node):
             if z>0:
                 theta = math.atan(r/z)
             elif z<0:
-                    theta = math.pi + math.atan(r/z)
+                theta = math.pi + math.atan(r/z)
             elif z==0 and x!=0 and y!=0:
-                    theta = math.pi/2
+                theta = math.pi/2
             elif x==0 and y==0 and z==0:
-                    theta = None
+                theta = None
             else:
-                    theta = math.acos(z/rho)
+                theta = math.acos(z/rho)
             
             # Determine Phi
             if x>0:
@@ -165,7 +165,7 @@ class Lidar2Cam(Node):
             return [phi, theta, rho]
 
         # Apply Spherical Conversion on each point
-        return list(map(lambda x: cartesian_to_spherical(x), ptc_arr))
+        return np.array(list(map(lambda x: cartesian_to_spherical(x), ptc_arr)))
 
     # --------------- Converts Spherical Coordinates to Pointcloud in Camera Frame -------------- #
     def spherical2xyz(self, spr_arr):
@@ -176,9 +176,9 @@ class Lidar2Cam(Node):
             z = rho * math.cos(theta)
             return [x, y, z]
         # Apply Cartesian Conversion on each point
-        return list(map(lambda x: spherical_to_cartesian(x), spr_arr))
+        return np.array(list(map(lambda x: spherical_to_cartesian(x), spr_arr)))
     
-    
+
     # ---- Converts bbox coordinate format from (centerpoint, size_x, size_y) ---- #
     # ------------------- to (top_y, bottom_y, left_x, right_x) ------------------ #
     def box_to_corners(self, cx, cy, width, height):
@@ -240,8 +240,9 @@ class Lidar2Cam(Node):
         ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
 
         # Find the indices of the rows where the element with the median value occurs
+        print("Selected PointCloud in spherical:\n", ptc_sph_camera_real_filtered)
         median_r_idx = np.argsort(ptc_sph_camera_real_filtered[:, 2])[len(ptc_sph_camera_real_filtered)//2]
-        print(median_r_idx)
+        # print(median_r_idx)
         median_sph_point = ptc_sph_camera_real_filtered[median_r_idx]
         # print('ptc_sph_camera: ', ptc_sph_camera.shape)
         # median_r = np.median(ptc_sph_camera[:, 2])
@@ -253,23 +254,32 @@ class Lidar2Cam(Node):
 
         # Converting the point into xyz_cam_frame again
         print("median_sph_point: ", median_sph_point)
-        median_xyz_camera = self.spherical2xyz([median_sph_point])
+        median_xyz_camera = self.spherical2xyz([median_sph_point])[0]
         print("median_xyz_camera: ", median_xyz_camera)
 
         # ---------------------------------------------------------------------------- #
         #                   Creating a Marker Object to be published                   #
         # ---------------------------------------------------------------------------- #
         marker = Marker()
-        marker.header.frame_id = 'camera_front_left_center'
-        marker.type = Marker.CYLINDER
-        # marker.scale.x = 0.1  # diameter of cylinder
-        # marker.scale.y = 0.1  # diameter of cylinder
-        # marker.scale.z = 0.2  # length of cylinder
-        marker.pose.position.x = median_xyz_camera[0]
-        marker.pose.position.y = median_xyz_camera[1]
-        marker.pose.position.z = median_xyz_camera[2]
+        # marker.ns = "Cylinder" # unique ID
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.action = Marker().ADD
+        marker.type = Marker().CYLINDER
+        marker.header.frame_id = 'vimba_front_left_center'
+        marker.lifetime.sec = 1
+        marker.id = 100
+        marker.scale.x = 0.5  # diameter of cylinder
+        marker.scale.y = 0.5  # diameter of cylinder
+        marker.scale.z = 10.0  # length of cylinder
+        marker.pose.position.x = 1.0#median_xyz_camera[0]
+        marker.pose.position.y = 1.0#median_xyz_camera[1]
+        marker.pose.position.z = 0.0#median_xyz_camera[2]
+        marker.color.a = 1.0 
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 0.0
 
-        self.publisher_.publish(marker)
+        self.marker_pub.publish(marker)
 
         # ---------------------------------------------------------------------------- #
         #    Setting the buffers to None to wait for the next image-pointcloud pair    #

@@ -85,6 +85,7 @@ class Lidar2Cam(Node):
         # ------------------------------- Publishers ------------------------------ #
         self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
         self.cloud_pub = self.create_publisher(PointCloud2, "/filteredPointcloud", rclpy.qos.qos_profile_sensor_data)
+        self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
 
     def img_callback(self, msg):
         print("I")
@@ -180,55 +181,78 @@ class Lidar2Cam(Node):
         # ------------------------------ Do the Division ----------------------------- #
         ptc_z_camera = ptc_xyz_camera[:, 2]
         ptc_xyz_camera = np.divide(ptc_xyz_camera, ptc_z_camera.reshape(ptc_xyz_camera.shape[0], 1))
-        print("\t")
-        print("First Point: ", ptc_xyz_camera[0])
-        print("NORM_RT_Min Vals:", np.min(ptc_xyz_camera, axis=0))
-        print("NORM_RT_Max Vals: ", np.max(ptc_xyz_camera, axis=0))
+
 
         # ---------------------------------------------------------------------------- #
         #                    Point Comparison with BBox happens here                   #
         # ---------------------------------------------------------------------------- #
         
-        # ------------------- Convert the message to bounds ------------------ #
+        # ------------------- Convert the bbox msg to (top, bottom, left, right) bounds ------------------ #
         y1, y2, x1, x2 = self.box_to_corners(self.bbox_msg.center.x, self.bbox_msg.center.y, self.bbox_msg.size_x, self.bbox_msg.size_y)
         
-        # ----- Applying first detection strategy to cut off top 40% of the bbox ----- #
+        # ----- Applying detection strategy to cut off top 40% of the bbox ----- #
         y1 = y1 + int(0.4 * self.bbox_msg.size_y)
         mask=(ptc_xyz_camera[:,0]>=x1)&(ptc_xyz_camera[:,0]<=x2)&(ptc_xyz_camera[:,1]>=y1)&(ptc_xyz_camera[:,1]<=y2)
         
-        # ------ Applying 2nd strategy to remove outliers, and select the median within 10~30th percentile----- #
-        # ------- Idea: Get the correct distance of the car from our car first, ------ #
-        # ---- in spherical coordinates and then decide where to place the marker ---- #
-        # ------- (in terms of theta/ x, y,z) What shape of the object needed? ------- #
+        # -------- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
         ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
-        
-        # Converting the Markers from XYZ Coordinates to Spherical coordinares
-
-        # Select the last column
-        values = ptc_xyz_camera[:, 2]
-
-        # Calculate the 10th and 40th percentiles
-        p10 = np.percentile(values, 10)
-        p30 = np.percentile(values, 30)
-
-        # Use a boolean mask to filter the points that lie outside the 10th to 40th percentile
-        mask = (values < p10) | (values > p30)
-        filtered_points = ptc_xyz_camera[mask]
-
-        # Calculate the median of the filtered points
-        median = np.median(filtered_points[:, 2])
-
+        ptc_sph_camera = self.xyz2spherical(ptc_xyz_camera)
         # Find the indices of the rows where the element with the median value occurs
-        indices = np.argwhere(filtered_points[:, 2] == median)
-        print(indices)
+        print("ptc_sph_camera: ", ptc_sph_camera)
+        median_r = np.median(ptc_sph_camera[:, 2])
+        indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
+        median_sph_point = ptc_sph_camera[indices]
+        # Converting the point into xyz_cam_frame again
+        median_xyz_camera = self.spherical2xyz(median_sph_point)
 
-        # Index into the original array using the indices and return the corresponding rows
-        median_rows = filtered_points[indices]
+        # ---------------------------------------------------------------------------- #
+        #                   Creating a Marker Object to be published                   #
+        # ---------------------------------------------------------------------------- #
+        marker = Marker()
+        marker.header.frame_id = 'camera_front_left_center'
+        marker.type = Marker.CYLINDER
+        # marker.scale.x = 0.1  # diameter of cylinder
+        # marker.scale.y = 0.1  # diameter of cylinder
+        # marker.scale.z = 0.2  # length of cylinder
+        marker.pose.position.x = median_xyz_camera[0]
+        marker.pose.position.y = median_xyz_camera[1]
+        marker.pose.position.z = median_xyz_camera[2]
 
-        # ---- Applying 3rd strategy, take 10th to 40th percentile's median value ---- #
-        ptc_numpy_record_filtered = ptc_numpy_record[mask]
-        print("ptc_numpy_record_filtered: ", ptc_numpy_record_filtered.shape)
-        ptc_numpy_record_filtered_msg = array_to_pointcloud2(ptc_numpy_record_filtered, stamp=None, frame_id="luminar_front")
+        self.publisher_.publish(marker)
+
+        # # ------ Applying 2nd strategy to remove outliers, and select the median within 10~30th percentile----- #
+        # # ------- Idea: Get the correct distance of the car from our car first, ------ #
+        # # ---- in spherical coordinates and then decide where to place the marker ---- #
+        # # ------- (in terms of theta/ x, y,z) What shape of the object needed? ------- #
+        # ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
+        
+        # # Converting the Markers from XYZ Coordinates to Spherical coordinares
+
+        # # Select the last column
+        # values = ptc_xyz_camera[:, 2]
+
+        # # Calculate the 10th and 40th percentiles
+        # p10 = np.percentile(values, 10)
+        # p30 = np.percentile(values, 30)
+
+        # # Use a boolean mask to filter the points that lie outside the 10th to 40th percentile
+        # mask = (values < p10) | (values > p30)
+        # filtered_points = ptc_xyz_camera[mask]
+
+        # # Calculate the median of the filtered points
+        # median = np.median(filtered_points[:, 2])
+
+        # # Find the indices of the rows where the element with the median value occurs
+        # indices = np.argwhere(filtered_points[:, 2] == median)
+        # print(indices)
+
+        # # Index into the original array using the indices and return the corresponding rows
+        # median_rows = filtered_points[indices]
+
+        # # ---- Applying 3rd strategy, take 10th to 40th percentile's median value ---- #
+        # ptc_numpy_record_filtered = ptc_numpy_record[mask]
+        # print("ptc_numpy_record_filtered: ", ptc_numpy_record_filtered.shape)
+        # ptc_numpy_record_filtered_msg = array_to_pointcloud2(ptc_numpy_record_filtered, stamp=None, frame_id="luminar_front")
 
         # -------------------- Plotting everything into the Image -------------------- #
         image = self.img_tocv2(self.img_msg) 

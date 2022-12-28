@@ -89,8 +89,6 @@ class Lidar2Cam(Node):
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
         # ---------------------------------------------------------------------------- #
-        self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
-        self.cloud_pub = self.create_publisher(PointCloud2, "/filteredPointcloud", rclpy.qos.qos_profile_sensor_data)
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
 
 
@@ -195,9 +193,9 @@ class Lidar2Cam(Node):
 
 
         # ---------------------------------------------------------------------------- #
-        #                    Point Comparison with BBox happens here                   #
+        #                  PointCloud Filtering to get points in BBOX                  #
         # ---------------------------------------------------------------------------- #
-        
+
         # ------------------- Convert the bbox msg to (top, bottom, left, right) bounds ------------------ #
         y1, y2, x1, x2 = self.box_to_corners(self.bbox_msg.center.x, self.bbox_msg.center.y, self.bbox_msg.size_x, self.bbox_msg.size_y)
         
@@ -205,14 +203,15 @@ class Lidar2Cam(Node):
         y1 = y1 + int(0.4 * self.bbox_msg.size_y)
         mask=(ptc_xyz_camera[:,0]>=x1)&(ptc_xyz_camera[:,0]<=x2)&(ptc_xyz_camera[:,1]>=y1)&(ptc_xyz_camera[:,1]<=y2)
         
-        # -------- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
+        # ----- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
         ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
         ptc_sph_camera = self.xyz2spherical(ptc_xyz_camera)
+
         # Find the indices of the rows where the element with the median value occurs
-        print("ptc_sph_camera: ", ptc_sph_camera)
         median_r = np.median(ptc_sph_camera[:, 2])
         indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
         median_sph_point = ptc_sph_camera[indices]
+
         # Converting the point into xyz_cam_frame again
         median_xyz_camera = self.spherical2xyz(median_sph_point)
 
@@ -231,88 +230,9 @@ class Lidar2Cam(Node):
 
         self.publisher_.publish(marker)
 
-        # # ------ Applying 2nd strategy to remove outliers, and select the median within 10~30th percentile----- #
-        # # ------- Idea: Get the correct distance of the car from our car first, ------ #
-        # # ---- in spherical coordinates and then decide where to place the marker ---- #
-        # # ------- (in terms of theta/ x, y,z) What shape of the object needed? ------- #
-        # ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
-        
-        # # Converting the Markers from XYZ Coordinates to Spherical coordinares
-
-        # # Select the last column
-        # values = ptc_xyz_camera[:, 2]
-
-        # # Calculate the 10th and 40th percentiles
-        # p10 = np.percentile(values, 10)
-        # p30 = np.percentile(values, 30)
-
-        # # Use a boolean mask to filter the points that lie outside the 10th to 40th percentile
-        # mask = (values < p10) | (values > p30)
-        # filtered_points = ptc_xyz_camera[mask]
-
-        # # Calculate the median of the filtered points
-        # median = np.median(filtered_points[:, 2])
-
-        # # Find the indices of the rows where the element with the median value occurs
-        # indices = np.argwhere(filtered_points[:, 2] == median)
-        # print(indices)
-
-        # # Index into the original array using the indices and return the corresponding rows
-        # median_rows = filtered_points[indices]
-
-        # # ---- Applying 3rd strategy, take 10th to 40th percentile's median value ---- #
-        # ptc_numpy_record_filtered = ptc_numpy_record[mask]
-        # print("ptc_numpy_record_filtered: ", ptc_numpy_record_filtered.shape)
-        # ptc_numpy_record_filtered_msg = array_to_pointcloud2(ptc_numpy_record_filtered, stamp=None, frame_id="luminar_front")
-
-        # -------------------- Plotting everything into the Image -------------------- #
-        image = self.img_tocv2(self.img_msg) 
-        # print("image_width, height:", image.shape)
-        # image = cv2.undistort(image, self.camera_info, np.array([-0.272455, 0.268395, -0.005054, 0.000391, 0.000000]))
-        ptc_xyz_camera = ptc_xyz_camera[mask]
-        
-        # Doing Simple Data Processing to get the location where Marker will be placed
-
-        
-        border_size=300
-        image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
-
-        z_min=np.min(ptc_z_camera)
-        z_range=np.max(ptc_z_camera)-z_min
-        ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
-        ptc_z_camera=ptc_z_camera.astype(np.uint8)
-        color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
-        r=ptc_xyz_camera.shape[0]
-        print(r)
-        for j in range(r):
-            i=ptc_xyz_camera[j]
-            c=color[np.newaxis,np.newaxis,j,0]
-            a = int(np.floor(i[0]) + border_size)
-            b = int(np.floor(i[1]) + border_size)
-            if a>0 and b>0:
-                try:
-                    image_undistorted[b-1:b+2,a-1:a+2] = c
-                except:
-                    continue
-
-        # for i in ptc_xyz_camera[mask]:
-        #     image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
-        #     # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
-
-        # Publishing the Image and PointCloud
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
-        self.cloud_pub.publish(ptc_numpy_record_filtered_msg)
-
-        # # Pause the code
-        # try:
-        #     # Start an infinite loop
-        #     while True:
-        #         # Sleep for one second
-        #         time.sleep(1)
-        # except KeyboardInterrupt:
-        #     # Handle the KeyboardInterrupt exception
-        #     print("Exiting loop")
-
+        # ---------------------------------------------------------------------------- #
+        #    Setting the buffers to None to wait for the next image-pointcloud pair    #
+        # ---------------------------------------------------------------------------- #
         self.image_msg = None
         self.point_cloud_msg = None 
         

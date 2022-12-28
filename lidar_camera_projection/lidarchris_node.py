@@ -18,7 +18,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, get_xyz_points
 import os
 import time
-from ai import cs
+import math
 print(os.getcwd())
 
 class Lidar2Cam(Node):
@@ -126,27 +126,30 @@ class Lidar2Cam(Node):
         return image
 
 
-    # --------------- Converts pointclouds to spherical Coordinates -------------- #
+    # ------ Converts pointclouds(in camera frame) to spherical Coordinates ------ # (Spherical coordinates following Wikipedia definition here: https://en.wikipedia.org/wiki/Spherical_coordinate_system)
     # Output points are in degrees
     def xyz2spherical(self, ptc_arr):
-        # Transformation of cartesian point cloud array to spherical point cloud array
-        spherical_pcd_points = np.zeros(ptc_arr.shape)
-        points_out_of_cam_perspective = []
-        for i in range (0, ptc_arr.shape[0]):
-            # Cartesian --> spherical (theta_x, theta_y, r), where theta_x and theta_y are in degrees and are in the frame of OpenCV?(likely)
-            spherical_pcd_points[i, 0], spherical_pcd_points[i, 1], spherical_pcd_points[i, 2] = cs.cart2sp(ptc_arr[i,0],ptc_arr[i,1], ptc_arr[i,2])  #xyz --> r theta phi
-        return spherical_pcd_points # Spherical or XYZ?
+        def cartesian_to_spherical(xyz):
+            x, y, z = xyz # in camera frame(OpenCV coordinates)
+            # print(math.acos(x/z))
+            rho   = math.sqrt(x**2 + y**2 + z**2)
+            phi   = math.acos(max(-1, min(x/z, 1))) # for z-y axis
+            theta = math.acos(max(-1, min(z/rho, 1))) # for x-y axis
+            return [phi, theta, rho]
 
-    # --------------- Converts Spherical Coordinates to Pointcloud -------------- #
+        # Apply Spherical Conversion on each point
+        return np.array(list(map(lambda x: cartesian_to_spherical(x), ptc_arr)))
+
+    # --------------- Converts Spherical Coordinates to Pointcloud in Camera Frame -------------- #
     def spherical2xyz(self, spr_arr):
-        # Transformation of cartesian point cloud array to spherical point cloud array
-        dimensions = spr_arr.shape
-        cartesian_pcd_points_cam_perspective = np.zeros(spr_arr.shape)
-        for i in range (0, dimensions[0]):
-            # Cartesian --> spherical
-            cartesian_pcd_points_cam_perspective[i, 0], cartesian_pcd_points_cam_perspective[i, 1], cartesian_pcd_points_cam_perspective[i, 2] = \
-            cs.sp2cart(spr_arr[i,0],spr_arr[i,1], spr_arr[i,2])  #xyz --> r theta phi
-        return cartesian_pcd_points_cam_perspective
+        def spherical_to_cartesian(spr):
+            phi, theta, rho = spr
+            x = rho * math.sin(theta) * math.cos(phi)
+            y = rho * math.sin(theta) * math.sin(phi)
+            z = rho * math.cos(theta)
+            return [x, y, z]
+        # Apply Cartesian Conversion on each point
+        return np.array(list(map(lambda x: spherical_to_cartesian(x), spr_arr)))
     
     # ---- Converts bbox coordinate format from (centerpoint, size_x, size_y) ---- #
     # ------------------- to (top_y, bottom_y, left_x, right_x) ------------------ #
@@ -182,14 +185,14 @@ class Lidar2Cam(Node):
 
 
         # ------------------------- Applying the Camera Info ------------------------- #
-        ptc_xyz_camera = ptc_xyz_camera.T
-        ptc_xyz_camera = self.camera_info @ ptc_xyz_camera
-        ptc_xyz_camera = ptc_xyz_camera.T
+        ptc_xyz_camera      = ptc_xyz_camera.T
+        ptc_xyz_camera_real = self.camera_info @ ptc_xyz_camera
+        ptc_xyz_camera_real = ptc_xyz_camera_real.T
 
 
         # ---------------------- Applying division on the Z-axis --------------------- #
-        ptc_z_camera = ptc_xyz_camera[:, 2]
-        ptc_xyz_camera = np.divide(ptc_xyz_camera, ptc_z_camera.reshape(ptc_xyz_camera.shape[0], 1))
+        ptc_z_camera = ptc_xyz_camera_real[:, 2]
+        ptc_xyz_camera_normed = np.divide(ptc_xyz_camera_real, ptc_z_camera.reshape(ptc_xyz_camera_real.shape[0], 1))
 
 
         # ---------------------------------------------------------------------------- #
@@ -201,19 +204,29 @@ class Lidar2Cam(Node):
         
         # ----- Applying detection strategy to cut off top 40% of the bbox ----- #
         y1 = y1 + int(0.4 * self.bbox_msg.size_y)
-        mask=(ptc_xyz_camera[:,0]>=x1)&(ptc_xyz_camera[:,0]<=x2)&(ptc_xyz_camera[:,1]>=y1)&(ptc_xyz_camera[:,1]<=y2)
+        mask=(ptc_xyz_camera_normed[:,0]>=x1)&(ptc_xyz_camera_normed[:,0]<=x2)&(ptc_xyz_camera_normed[:,1]>=y1)&(ptc_xyz_camera_normed[:,1]<=y2)
         
         # ----- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
-        ptc_xyz_camera = ptc_xyz_camera[mask] # Filtering the points
-        ptc_sph_camera = self.xyz2spherical(ptc_xyz_camera)
+        ptc_xyz_camera_real_filtered = ptc_xyz_camera_real[mask] # Filtering the points
+        print("Selected PointCloud:, \n", ptc_xyz_camera_real_filtered)
+        ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
 
         # Find the indices of the rows where the element with the median value occurs
-        median_r = np.median(ptc_sph_camera[:, 2])
-        indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
-        median_sph_point = ptc_sph_camera[indices]
+        median_r_idx = np.argsort(ptc_sph_camera_real_filtered[:, 2])[len(ptc_sph_camera_real_filtered)//2]
+        print(median_r_idx)
+        median_sph_point = ptc_sph_camera_real_filtered[median_r_idx]
+        # print('ptc_sph_camera: ', ptc_sph_camera.shape)
+        # median_r = np.median(ptc_sph_camera[:, 2])
+        # print('median_r: ', median_r)
+        # indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
+        # print('indices: ', indices)
+        # median_sph_point = ptc_sph_camera[indices]
+        # print('median_sph_point: ', median_sph_point)
 
         # Converting the point into xyz_cam_frame again
-        median_xyz_camera = self.spherical2xyz(median_sph_point)
+        print("median_sph_point: ", median_sph_point)
+        median_xyz_camera = self.spherical2xyz([median_sph_point])
+        print("median_xyz_camera: ", median_xyz_camera)
 
         # ---------------------------------------------------------------------------- #
         #                   Creating a Marker Object to be published                   #

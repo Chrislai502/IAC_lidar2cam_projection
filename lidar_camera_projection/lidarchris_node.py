@@ -18,6 +18,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, get_xyz_points
 import os
 import time
+from ai import cs
 print(os.getcwd())
 
 class Lidar2Cam(Node):
@@ -112,6 +113,29 @@ class Lidar2Cam(Node):
             print(e)
         return image
 
+    # ---------------------------------------------------------------------------- #
+    #       Func converts pointclouds to spherical Coordinates and vice-versa      #
+    # ---------------------------------------------------------------------------- #
+    # Output points are in degrees
+    def xyz2spherical(self, ptc_arr):
+        # Transformation of cartesian point cloud array to spherical point cloud array
+        spherical_pcd_points = np.zeros(ptc_arr.shape)
+        points_out_of_cam_perspective = []
+        for i in range (0, ptc_arr.shape[0]):
+            # Cartesian --> spherical (theta_x, theta_y, r), where theta_x and theta_y are in degrees and are in the frame of OpenCV?(likely)
+            spherical_pcd_points[i, 0], spherical_pcd_points[i, 1], spherical_pcd_points[i, 2] = cs.cart2sp(ptc_arr[i,0],ptc_arr[i,1], ptc_arr[i,2])  #xyz --> r theta phi
+        return spherical_pcd_points # Spherical or XYZ?
+
+    def spherical2xyz(self, spr_arr):
+        # Transformation of cartesian point cloud array to spherical point cloud array
+        dimensions = spr_arr.shape
+        cartesian_pcd_points_cam_perspective = np.zeros(spr_arr.shape)
+        for i in range (0, dimensions[0]):
+            # Cartesian --> spherical
+            cartesian_pcd_points_cam_perspective[i, 0], cartesian_pcd_points_cam_perspective[i, 1], cartesian_pcd_points_cam_perspective[i, 2] = \
+            cs.sp2cart(spr_arr[i,0],spr_arr[i,1], spr_arr[i,2])  #xyz --> r theta phi
+        return cartesian_pcd_points_cam_perspective
+    
     def box_to_corners(self, cx, cy, width, height):
         half_width = width / 2
         half_height = height / 2

@@ -207,20 +207,21 @@ class Lidar2Cam(Node):
         # --------------------------- Applying the Rotation -------------------------- # Alt + x
         translation_luminar_front2_flc = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), numpoints)
         assert(translation_luminar_front2_flc.shape == (3, numpoints)), "Translation is not 3 x N"
-        ptc_xyz_camera = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_luminar_front2_flc # This is correct
-        ptc_xyz_camera = ptc_xyz_camera.T
-        assert(ptc_xyz_camera.shape == (numpoints, 3)), "PointCloud_camera is not N x 3"
+        ptc_xyz_camera_real = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_luminar_front2_flc # This is correct
+        ptc_xyz_camera_real = ptc_xyz_camera_real.T
+        assert(ptc_xyz_camera_real.shape == (numpoints, 3)), "PointCloud_camera is not N x 3"
 
 
         # ------------------------- Applying the Camera Info ------------------------- #
-        ptc_xyz_camera      = ptc_xyz_camera.T
-        ptc_xyz_camera_real = self.camera_info @ ptc_xyz_camera
-        ptc_xyz_camera_real = ptc_xyz_camera_real.T
+        ptc_xyz_camera_real      = ptc_xyz_camera_real.T
+        ptc_xyz_camera_real_px = self.camera_info @ ptc_xyz_camera_real
+        ptc_xyz_camera_real_px = ptc_xyz_camera_real_px.T
+        ptc_xyz_camera_real      = ptc_xyz_camera_real.T
 
 
         # ---------------------- Applying division on the Z-axis --------------------- #
-        ptc_z_camera = ptc_xyz_camera_real[:, 2]
-        ptc_xyz_camera_normed = np.divide(ptc_xyz_camera_real, ptc_z_camera.reshape(ptc_xyz_camera_real.shape[0], 1))
+        ptc_z_camera = ptc_xyz_camera_real_px[:, 2]
+        ptc_xyz_camera_normed = np.divide(ptc_xyz_camera_real_px, ptc_z_camera.reshape(ptc_xyz_camera_real_px.shape[0], 1))
 
 
         # ---------------------------------------------------------------------------- #
@@ -236,8 +237,8 @@ class Lidar2Cam(Node):
         
         # ----- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
         ptc_xyz_camera_real_filtered = ptc_xyz_camera_real[mask] # Filtering the points
-        print("Selected PointCloud:, \n", ptc_xyz_camera_real_filtered)
-        print("Seleced Poitncloud Normed:\n", ptc_xyz_camera_normed[mask])
+        print("Selected PointCloud:, \n", ptc_xyz_camera_real_px)
+        print("Seleced Poitncloud ptc_xyz_camera_real:\n", ptc_xyz_camera_real)
         ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
 
         # Find the indices of the rows where the element with the median value occurs
@@ -255,7 +256,7 @@ class Lidar2Cam(Node):
 
         # Converting the point into xyz_cam_frame again
         print("median_sph_point: ", median_sph_point)
-        median_xyz_camera = self.spherical2xyz([median_sph_point])[0] / 1000
+        median_xyz_camera = self.spherical2xyz([median_sph_point])[0]
         print("median_xyz_camera: ", median_xyz_camera)
 
         # ---------------------------------------------------------------------------- #

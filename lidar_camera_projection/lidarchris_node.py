@@ -30,7 +30,9 @@ class Lidar2Cam(Node):
         self.bbox_msg = None # Initialize an empty array
         self.img_msg = None
 
-        # Front Left Camera only
+        # ---------------------------------------------------------------------------- #
+        #         All the Hard Coded Matrices Applies to Front Left Camera ONLY        #
+        # ---------------------------------------------------------------------------- #
         self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
                                      [0.000000, 1731.274561, 295.484988], 
                                      [0.000000, 0.000000, 1.000000*2]])*0.5
@@ -44,19 +46,20 @@ class Lidar2Cam(Node):
                                                     [ 0.05990699,  0.00453683, -0.99819365],
                                                     [ 0.9979756,   0.02111691,  0.05998988]])
 
-        # # Multiply the rotation Matrices by K
-        # self.RotMat_K      = self.camera_info @ self.RotMat
-        # self.translation_K = self.camera_info @ self.translation
-
-        # -------------------------------- QOS Profile ------------------------------- #
+        # ---------------------------------------------------------------------------- #
+        #                                  QOS Profile                                 #
+        # ---------------------------------------------------------------------------- #
         self.qos_profile =  QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=1,
         )
 
-        # ------------------------------- Subscriptions ------------------------------ #
-        # ----------------------------------- LIDAR ---------------------------------- #
+        # ---------------------------------------------------------------------------- #
+        #                                 Subscriptions                                #
+        # ---------------------------------------------------------------------------- #
+        
+        # LIDAR PointCloud ----------------------------- #
         self.pointcloud_sub = self.create_subscription(
             msg_type    = PointCloud2,
             topic       = '/luminar_front_points',
@@ -65,7 +68,7 @@ class Lidar2Cam(Node):
         )
         self.pointcloud_sub  # prevent unused variable warning
 
-        # ------------------------------  Bounding Box ---------------------------------- #
+        # Bounding Box ---------------------------------- #
         self.image_sub = self.create_subscription(
             msg_type    = BoundingBox2D, 
             topic       = 'vimba_front_left_center/out/objects',
@@ -73,7 +76,8 @@ class Lidar2Cam(Node):
             qos_profile = self.qos_profile
         )
         self.image_sub # prevent unused variable warning
-        # ------------------------------  Image ---------------------------------- #
+
+        # YOLO BBOX Image ---------------------------------- #
         self.image_sub = self.create_subscription(
             msg_type    = Image,
             topic       = 'vimba_front_left_center/out/image',
@@ -82,11 +86,18 @@ class Lidar2Cam(Node):
         )
         self.image_sub # prevent unused variable warning
 
-        # ------------------------------- Publishers ------------------------------ #
+        # ---------------------------------------------------------------------------- #
+        #                                  Publishers                                  #
+        # ---------------------------------------------------------------------------- #
         self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
         self.cloud_pub = self.create_publisher(PointCloud2, "/filteredPointcloud", rclpy.qos.qos_profile_sensor_data)
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
 
+
+
+    # ---------------------------------------------------------------------------- #
+    #                     Callback Functions for Subscriptions                     #
+    # ---------------------------------------------------------------------------- #
     def img_callback(self, msg):
         print("I")
         self.img_msg = msg
@@ -105,7 +116,9 @@ class Lidar2Cam(Node):
             print("+")
             self.bbox_ptc_callback()
 
-    '''Helper Function'''
+    # ---------------------------------------------------------------------------- #
+    #         Helper Functions for Projection Calculation and Visualization        #
+    # ---------------------------------------------------------------------------- #
     def img_tocv2(self, message):
         try:
             # Convert the ROS2 Image message to a NumPy array
@@ -114,9 +127,8 @@ class Lidar2Cam(Node):
             print(e)
         return image
 
-    # ---------------------------------------------------------------------------- #
-    #       Func converts pointclouds to spherical Coordinates and vice-versa      #
-    # ---------------------------------------------------------------------------- #
+
+    # --------------- Converts pointclouds to spherical Coordinates -------------- #
     # Output points are in degrees
     def xyz2spherical(self, ptc_arr):
         # Transformation of cartesian point cloud array to spherical point cloud array
@@ -127,6 +139,7 @@ class Lidar2Cam(Node):
             spherical_pcd_points[i, 0], spherical_pcd_points[i, 1], spherical_pcd_points[i, 2] = cs.cart2sp(ptc_arr[i,0],ptc_arr[i,1], ptc_arr[i,2])  #xyz --> r theta phi
         return spherical_pcd_points # Spherical or XYZ?
 
+    # --------------- Converts Spherical Coordinates to Pointcloud -------------- #
     def spherical2xyz(self, spr_arr):
         # Transformation of cartesian point cloud array to spherical point cloud array
         dimensions = spr_arr.shape
@@ -137,6 +150,8 @@ class Lidar2Cam(Node):
             cs.sp2cart(spr_arr[i,0],spr_arr[i,1], spr_arr[i,2])  #xyz --> r theta phi
         return cartesian_pcd_points_cam_perspective
     
+    # ---- Converts bbox coordinate format from (centerpoint, size_x, size_y) ---- #
+    # ------------------- to (top_y, bottom_y, left_x, right_x) ------------------ #
     def box_to_corners(self, cx, cy, width, height):
         half_width = width / 2
         half_height = height / 2
@@ -148,12 +163,12 @@ class Lidar2Cam(Node):
 
         return (y1, y2, x1, x2) #(up, down, left, right)
 
-    ''' 
-    In the middle of debugging the LIDAR
-    '''
+
+    # ---------------------------------------------------------------------------- #
+    #                      Lidar camera projection right here                      #
+    # ---------------------------------------------------------------------------- #
     def bbox_ptc_callback(self):
 
-        # -------------------- Lidar camera projection right here -------------------- #
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)
         numpoints = ptc_xyz_lidar.shape[0]
@@ -161,10 +176,6 @@ class Lidar2Cam(Node):
    
 
         # --------------------------- Applying the Rotation -------------------------- # Alt + x
-        # ---------------------------------------------------------------------------- # Alt + Y
-        # ---------------------------------------------------------------------------- # Alt + shift + x
-        #                                      sdf                                     #
-        # ---------------------------------------------------------------------------- #
         translation_luminar_front2_flc = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), numpoints)
         assert(translation_luminar_front2_flc.shape == (3, numpoints)), "Translation is not 3 x N"
         ptc_xyz_camera = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_luminar_front2_flc # This is correct
@@ -178,7 +189,7 @@ class Lidar2Cam(Node):
         ptc_xyz_camera = ptc_xyz_camera.T
 
 
-        # ------------------------------ Do the Division ----------------------------- #
+        # ---------------------- Applying division on the Z-axis --------------------- #
         ptc_z_camera = ptc_xyz_camera[:, 2]
         ptc_xyz_camera = np.divide(ptc_xyz_camera, ptc_z_camera.reshape(ptc_xyz_camera.shape[0], 1))
 

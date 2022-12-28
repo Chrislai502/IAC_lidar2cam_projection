@@ -237,6 +237,7 @@ class Lidar2Cam(Node):
         # ----- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
         ptc_xyz_camera_real_filtered = ptc_xyz_camera_real[mask] # Filtering the points
         print("Selected PointCloud:, \n", ptc_xyz_camera_real_filtered)
+        print("Seleced Poitncloud Normed:\n", ptc_xyz_camera_normed[mask])
         ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
 
         # Find the indices of the rows where the element with the median value occurs
@@ -254,32 +255,50 @@ class Lidar2Cam(Node):
 
         # Converting the point into xyz_cam_frame again
         print("median_sph_point: ", median_sph_point)
-        median_xyz_camera = self.spherical2xyz([median_sph_point])[0]
+        median_xyz_camera = self.spherical2xyz([median_sph_point])[0] / 1000
         print("median_xyz_camera: ", median_xyz_camera)
 
         # ---------------------------------------------------------------------------- #
         #                   Creating a Marker Object to be published                   #
         # ---------------------------------------------------------------------------- #
-        marker = Marker()
-        # marker.ns = "Cylinder" # unique ID
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.action = Marker().ADD
-        marker.type = Marker().CYLINDER
-        marker.header.frame_id = 'vimba_front_left_center'
-        marker.lifetime.sec = 1
-        marker.id = 100
-        marker.scale.x = 0.5  # diameter of cylinder
-        marker.scale.y = 0.5  # diameter of cylinder
-        marker.scale.z = 10.0  # length of cylinder
-        marker.pose.position.x = 1.0#median_xyz_camera[0]
-        marker.pose.position.y = 1.0#median_xyz_camera[1]
-        marker.pose.position.z = 0.0#median_xyz_camera[2]
-        marker.color.a = 1.0 
-        marker.color.r = 0.0
-        marker.color.g = 1.0
-        marker.color.b = 0.0
+        # marker = Marker()
+        # # marker.ns = "Cylinder" # unique ID
+        # marker.header.stamp = self.get_clock().now().to_msg()
+        # marker.action = Marker().ADD
+        # marker.type = Marker().CYLINDER
+        # marker.header.frame_id = 'vimba_front_left_center'
+        # marker.lifetime.sec = 1
+        # marker.id = 100
+        # marker.scale.x = 0.5  # diameter of cylinder
+        # marker.scale.y = 0.5  # diameter of cylinder
+        # marker.scale.z = 10.0  # length of cylinder
+        # marker.pose.position.x = 1.0#median_xyz_camera[0]
+        # marker.pose.position.y = 1.0#median_xyz_camera[1]
+        # marker.pose.position.z = 0.0#median_xyz_camera[2]
+        # marker.color.a = 1.0 
+        # marker.color.r = 0.0
+        # marker.color.g = 1.0
+        # marker.color.b = 0.0
 
-        self.marker_pub.publish(marker)
+        marker_msg = Marker()
+        marker_msg.header.frame_id = "vimba_front_left_center"
+        marker_msg.header.stamp = self.point_cloud_msg.header.stamp
+        marker_msg.ns = "Lidar_detection"
+        marker_msg.id = 0
+        marker_msg.type = 1
+        marker_msg.action = 0
+        marker_msg.pose.position.x = 1.0
+        marker_msg.pose.position.y = 1.0
+        marker_msg.pose.position.z = 0.0
+        marker_msg.pose.orientation.w = 1.0
+        marker_msg.scale.x = 2.9
+        marker_msg.scale.y = 1.6
+        marker_msg.scale.z = 1.0
+        marker_msg.color.a = 1.0
+        marker_msg.color.g = 1.0
+        marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
+
+        self.marker_pub.publish(marker_msg)
 
         # ---------------------------------------------------------------------------- #
         #    Setting the buffers to None to wait for the next image-pointcloud pair    #

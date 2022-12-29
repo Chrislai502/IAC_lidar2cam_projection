@@ -286,16 +286,17 @@ class Lidar2Cam(Node):
         marker_msg.header.stamp = self.point_cloud_msg.header.stamp
         marker_msg.ns = "Lidar_detection"
         marker_msg.id = 0
-        marker_msg.type = 1
+        marker_msg.type = Marker().CYLINDER
         marker_msg.action = 0
-        marker_msg.pose.position.x = 1.0
-        marker_msg.pose.position.y = 1.0
-        marker_msg.pose.position.z = 0.0
-        marker_msg.pose.orientation.w = 1.0
-        marker_msg.scale.x = 2.9
-        marker_msg.scale.y = 1.6
-        marker_msg.scale.z = 1.0
-        marker_msg.color.a = 1.0
+        marker_msg.pose.position.x = median_xyz_camera[0]
+        marker_msg.pose.position.y = median_xyz_camera[1]
+        marker_msg.pose.position.z = median_xyz_camera[2]
+        marker_msg.pose.orientation.x = -1.0
+        # marker_msg.pose.orientation.w = 0.0
+        marker_msg.scale.x = 1.0
+        marker_msg.scale.y = 1.0
+        marker_msg.scale.z = 10.0
+        marker_msg.color.a = 0.5
         marker_msg.color.g = 1.0
         marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
 

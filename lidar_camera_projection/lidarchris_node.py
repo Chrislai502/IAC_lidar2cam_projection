@@ -269,7 +269,7 @@ class Lidar2Cam(Node):
         )
         labels = np.array(
             o3d_pcd.cluster_dbscan(
-                eps=20, min_points=40, print_progress=False
+                eps=2, min_points=40, print_progress=False
             )
         )
         max_label = labels.max()
@@ -319,9 +319,9 @@ class Lidar2Cam(Node):
             center_max=cluster_bbox.get_max_bound()
             center_min=cluster_bbox.get_min_bound()
             center = cluster_bbox.get_center()
-            print(center_max[1])
             extent=cluster_bbox.get_extent()
-            center=[extent[0]/2 + center_min[0],0.0,extent[2]/2 + center_min[2]]
+            print(center,extent)
+            center=[center[0],center[1]+extent[1]*1.25,center[2]]
 
             # center = cluster_bbox.get_center()
             # extent = cluster_bbox.extent
@@ -345,9 +345,9 @@ class Lidar2Cam(Node):
             # marker_msg.pose.orientation.y = rotation[1]
             # marker_msg.pose.orientation.z = rotation[2]
             # marker_msg.pose.orientation.w = rotation[3]
-            marker_msg.scale.x = extent[0]
+            marker_msg.scale.x = -extent[0]
             marker_msg.scale.y = extent[1]
-            marker_msg.scale.z = extent[2]
+            marker_msg.scale.z = -extent[2]
             marker_msg.color.a = 0.5
             marker_msg.color.r = 1.0
             marker_msg.lifetime = Duration(sec=0, nanosec=400000000)

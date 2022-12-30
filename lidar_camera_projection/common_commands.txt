@@ -1,3 +1,15 @@
+# Running the Lidar_camera stack
+1) rviz2
+2) Yolo node:
+    ros2 run tensorrt_yolov7 tensorrt_yolov7_node_exe --ros-args -p engine_path:="/home/roar/ART/perception/model_trials/NVIDIA_AI_IOT_tensorrt_yolov7/yolo_deepstream/tensorrt_yolov7/build/yolov7PTQ.engine" -p debug:=0 -p frame_id:="a"
+3) rosbag:
+    cd ~
+    cd Chris
+    ros2 bag play cars_only -l
+4) lidar cam projection node
+    ros2 run lidar_camera_projection lidarchris_node
+# In any case if the lidar node does not run, source with command "a"
+
 # Pip install python package from github
 pip install "git+https://github.com/myuser/mypackage.git@<branch or tag>"
 pip install --force-reinstall 

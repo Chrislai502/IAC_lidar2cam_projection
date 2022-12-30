@@ -19,6 +19,8 @@ from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, 
 import os
 import time
 import math
+import open3d as o3d
+from scipy.spatial.transform import Rotation
 print(os.getcwd())
 
 class Lidar2Cam(Node):
@@ -97,21 +99,21 @@ class Lidar2Cam(Node):
     #                     Callback Functions for Subscriptions                     #
     # ---------------------------------------------------------------------------- #
     def img_callback(self, msg):
-        print("I")
+        # print("I")
         self.img_msg = msg
 
     def bbox_callback(self, msg):
-        print("B")
+        # print("B")
         self.bbox_msg = msg
         if self.point_cloud_msg is not None:
             print("+")
             self.bbox_ptc_callback()
 
     def point_cloud_callback(self, msg):
-        print("P")
+        # print("P")
         self.point_cloud_msg = msg
         if self.bbox_msg is not None:
-            print("+")
+            # print("+")
             self.bbox_ptc_callback()
 
     # ---------------------------------------------------------------------------- #
@@ -237,27 +239,60 @@ class Lidar2Cam(Node):
         
         # ----- Applying median filter naively on the points in the bbox after convertint them into Spherical Coordinates ------- #
         ptc_xyz_camera_real_filtered = ptc_xyz_camera_real[mask] # Filtering the points
-        print("Selected PointCloud:, \n", ptc_xyz_camera_real_px)
-        print("Seleced Poitncloud ptc_xyz_camera_real:\n", ptc_xyz_camera_real)
-        ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
+        ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask] # Filtering the points
+        # print("Selected PointCloud:, \n", ptc_xyz_camera_real_px)
+        # print("Seleced Poitncloud ptc_xyz_camera_real:\n", ptc_xyz_camera_real)
+        # ptc_sph_camera_real_filtered = self.xyz2spherical(ptc_xyz_camera_real_filtered)
 
-        # Find the indices of the rows where the element with the median value occurs
-        print("Selected PointCloud in spherical:\n", ptc_sph_camera_real_filtered)
-        median_r_idx = np.argsort(ptc_sph_camera_real_filtered[:, 2])[len(ptc_sph_camera_real_filtered)//2]
-        # print(median_r_idx)
-        median_sph_point = ptc_sph_camera_real_filtered[median_r_idx]
-        # print('ptc_sph_camera: ', ptc_sph_camera.shape)
-        # median_r = np.median(ptc_sph_camera[:, 2])
-        # print('median_r: ', median_r)
-        # indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
-        # print('indices: ', indices)
-        # median_sph_point = ptc_sph_camera[indices]
-        # print('median_sph_point: ', median_sph_point)
+        # # Find the indices of the rows where the element with the median value occurs
+        # print("Selected PointCloud in spherical:\n", ptc_sph_camera_real_filtered)
+        # median_r_idx = np.argsort(ptc_sph_camera_real_filtered[:, 2])[len(ptc_sph_camera_real_filtered)//2]
+        # # print(median_r_idx)
+        # median_sph_point = ptc_sph_camera_real_filtered[median_r_idx]
+        # # print('ptc_sph_camera: ', ptc_sph_camera.shape)
+        # # median_r = np.median(ptc_sph_camera[:, 2])
+        # # print('median_r: ', median_r)
+        # # indices = np.argwhere(ptc_sph_camera[:, 2] == median_r)
+        # # print('indices: ', indices)
+        # # median_sph_point = ptc_sph_camera[indices]
+        # # print('median_sph_point: ', median_sph_point)
 
-        # Converting the point into xyz_cam_frame again
-        print("median_sph_point: ", median_sph_point)
-        median_xyz_camera = self.spherical2xyz([median_sph_point])[0]
-        print("median_xyz_camera: ", median_xyz_camera)
+        # # Converting the point into xyz_cam_frame again
+        # print("median_sph_point: ", median_sph_point)
+        # median_xyz_camera = self.spherical2xyz([median_sph_point])[0]
+        num_points=len(ptc_xyz_lidar_filtered)
+        # ptc_xyz_camera_list=ptc_xyz_camera_real_filtered[num_points//2:num_points*3//4]
+        ptc_xyz_camera_list=ptc_xyz_lidar_filtered
+        median_xyz_camera=[]
+        o3d_pcd: o3d.geometry.PointCloud = o3d.geometry.PointCloud(
+            o3d.utility.Vector3dVector(ptc_xyz_camera_list)
+        )
+        labels = np.array(
+            o3d_pcd.cluster_dbscan(
+                eps=20, min_points=40, print_progress=False
+            )
+        )
+        max_label = labels.max()
+        print(max_label)
+        for i in range(max_label+1):
+            print(np.where(labels==i)[0].shape)
+            cluster=o3d_pcd.select_by_index(list(np.where(labels==i)[0]))
+
+            cluster_bbox=cluster.get_axis_aligned_bounding_box()
+            # cluster_bbox=cluster.get_oriented_bounding_box()
+            print(len(cluster_bbox.get_point_indices_within_bounding_box(o3d.utility.Vector3dVector(ptc_xyz_camera_list))))
+            median_xyz_camera.append(cluster_bbox)
+            # print(cluster_bbox.R)
+            print(cluster_bbox)
+            # median_xyz_camera.append(cluster.get_center())
+        # ptc_xyz_min=np.min(ptc_xyz_camera_list,0)
+        # ptc_xyz_max=np.max(ptc_xyz_camera_list,0)
+        # # median_xyz_camera.append(np.min(ptc_xyz_camera_list,0))
+        # # median_xyz_camera.append(np.max(ptc_xyz_camera_list,0))
+        # # median_xyz_camera.append(np.average(ptc_xyz_camera_list,0))
+        # median_xyz_camera.append((ptc_xyz_min+ptc_xyz_max)/2)
+        # x_length,y_length,z_length=ptc_xyz_max-ptc_xyz_min
+        # print("median_xyz_camera: ", median_xyz_camera)
 
         # ---------------------------------------------------------------------------- #
         #                   Creating a Marker Object to be published                   #
@@ -280,27 +315,44 @@ class Lidar2Cam(Node):
         # marker.color.r = 0.0
         # marker.color.g = 1.0
         # marker.color.b = 0.0
+        for cluster_bbox in median_xyz_camera:
+            center_max=cluster_bbox.get_max_bound()
+            center_min=cluster_bbox.get_min_bound()
+            center = cluster_bbox.get_center()
+            print(center_max[1])
+            extent=cluster_bbox.get_extent()
+            center=[extent[0]/2 + center_min[0],0.0,extent[2]/2 + center_min[2]]
 
-        marker_msg = Marker()
-        marker_msg.header.frame_id = "vimba_front_left_center"
-        marker_msg.header.stamp = self.point_cloud_msg.header.stamp
-        marker_msg.ns = "Lidar_detection"
-        marker_msg.id = 0
-        marker_msg.type = Marker().CYLINDER
-        marker_msg.action = 0
-        marker_msg.pose.position.x = median_xyz_camera[0]
-        marker_msg.pose.position.y = median_xyz_camera[1]
-        marker_msg.pose.position.z = median_xyz_camera[2]
-        marker_msg.pose.orientation.x = -1.0
-        # marker_msg.pose.orientation.w = 0.0
-        marker_msg.scale.x = 1.0
-        marker_msg.scale.y = 1.0
-        marker_msg.scale.z = 10.0
-        marker_msg.color.a = 0.5
-        marker_msg.color.g = 1.0
-        marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
+            # center = cluster_bbox.get_center()
+            # extent = cluster_bbox.extent
+            # rotation_matrix=cluster_bbox.R.copy()
+            # rotation_matrix=np.array([[1,0,0],
+            #                           [0,-1,0],
+            #                           [0,0,1]])
+            # rotation=Rotation.from_matrix(rotation_matrix).as_quat()
+            marker_msg = Marker()
+            # marker_msg.header.frame_id = "vimba_front_left_center"
+            marker_msg.header.frame_id = "luminar_front"
+            marker_msg.header.stamp = self.point_cloud_msg.header.stamp
+            marker_msg.ns = "Lidar_detection"
+            marker_msg.id = 0
+            marker_msg.type = Marker().CUBE
+            marker_msg.action = 0
+            marker_msg.pose.position.x = center[0]
+            marker_msg.pose.position.y = -center[1]
+            marker_msg.pose.position.z = center[2]
+            # marker_msg.pose.orientation.x = rotation[0]
+            # marker_msg.pose.orientation.y = rotation[1]
+            # marker_msg.pose.orientation.z = rotation[2]
+            # marker_msg.pose.orientation.w = rotation[3]
+            marker_msg.scale.x = extent[0]
+            marker_msg.scale.y = extent[1]
+            marker_msg.scale.z = extent[2]
+            marker_msg.color.a = 0.5
+            marker_msg.color.r = 1.0
+            marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
 
-        self.marker_pub.publish(marker_msg)
+            self.marker_pub.publish(marker_msg)
 
         # ---------------------------------------------------------------------------- #
         #    Setting the buffers to None to wait for the next image-pointcloud pair    #

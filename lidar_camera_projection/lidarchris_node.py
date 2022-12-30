@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
-from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D, BoundingBox2DArray
+from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D #, BoundingBox2DArray
 from builtin_interfaces.msg import Duration
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2, PointField, Image
@@ -317,12 +317,14 @@ class Lidar2Cam(Node):
         Helper function that convert list of boxes to a matrix
         '''
         mat_return = np.empty((3, 0))
-        for box in boxes:
-            top, bot, left, right = self.box_to_corners(box.center.x, box.center.y, box.size_x, box.size_y)
+        for box_msg in boxes:
+            # print("Infunc: ", box_msg)
+            top, bot, left, right = self.box_to_corners(box_msg.center.x, box_msg.center.y, box_msg.size_x, box_msg.size_y)
             mat = np.array([[left, right, right, left], 
                             [top,  top,   bot,   bot], 
                             [1 , 1 , 1 , 1 ]]) # (4x3 camera corner matrix)
-            np.hastack((mat_return, mat))
+            # print("Infunc: ", mat)
+            mat_return = np.hstack((mat_return, mat))
             
         return mat_return
 
@@ -341,12 +343,16 @@ class Lidar2Cam(Node):
         
         #1
         K_inv = inv(self.camera_info)
-        camera_corners_cam = K_inv @ self.boxes_to_matirx(self.bbox_corners.boxes)
-
+        print(self.bbox_msg)
+        camera_corners_cam = K_inv @ self.boxes_to_matirx([self.bbox_msg])
+        print(camera_corners_cam)
+        
         #2
         # Apply Inverse rotation matrix
-        R_inv = inv(self.rotation_matrix) 
-        camera_corners_lid = R_inv @ camera_corners_cam - self.translation_vector
+        R_inv = inv(self.RotMat_luminar_front2_flc) 
+        numboxes = 1
+        translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), 4*numboxes)
+        camera_corners_lid = R_inv @ camera_corners_cam - translation_stacked
 
         #3
         # Normalize all points on their Z-axis

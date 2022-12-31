@@ -194,6 +194,22 @@ class Lidar2Cam(Node):
 
         return (y1, y2, x1, x2) #(up, down, left, right)
 
+    # Helper function that convert list of boxes to a matrix
+    def boxes_to_matirx(self, boxes): 
+        '''
+        Helper function that convert list of boxes to a matrix
+        '''
+        mat_return = np.empty((3, 0))
+        for box_msg in boxes:
+            # print("Infunc: ", box_msg)
+            top, bot, left, right = self.box_to_corners(box_msg.center.x, box_msg.center.y, box_msg.size_x, box_msg.size_y)
+            mat = np.array([[left, right, right, left], 
+                            [top,  top,   bot,   bot], 
+                            [1 , 1 , 1 , 1 ]]) # (4x3 camera corner matrix)
+            # print("Infunc: ", mat)
+            mat_return = np.hstack((mat_return, mat))
+            
+        return mat_return
 
     # ---------------------------------------------------------------------------- #
     #                Inverse Lidar camera projection right here                    #
@@ -249,7 +265,7 @@ class Lidar2Cam(Node):
         #                  Reflecting the points on the labelled image                 #
         # ---------------------------------------------------------------------------- #
         image = self.img_tocv2(self.img_msg) 
-        ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
+        ptc_xyz_lidar_filtered = ptc_xyz_lidar#[mask]
         
         border_size=300
         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
@@ -277,7 +293,7 @@ class Lidar2Cam(Node):
         #     # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
 
         # Publishing the Image and PointCloud
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image))
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
 
         # # ---------------------------------------------------------------------------- #
         # #                                   Custering                                  #

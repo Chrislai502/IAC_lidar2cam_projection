@@ -21,7 +21,7 @@ import time
 import math
 from numpy.linalg import inv
 import open3d as o3d
-from utils import boxes_to_matirx
+from .utils_lidar import boxes_to_matirx
 print(os.getcwd())
 
 class Lidar2Cam(Node):
@@ -157,12 +157,20 @@ class Lidar2Cam(Node):
         camera_corners_lid_z = camera_corners_lid[2, :]
         camera_corners_lid_normed = camera_corners_lid/camera_corners_lid_z
 
+
+
+
         #3
         # Normalize all points on their Z-axis
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
         ptc_z_camera = ptc_xyz_lidar[:, 2].reshape((-1, 1))
         ptc_xyz_lidar_normed = ptc_xyz_lidar/ptc_z_camera
+
+        # Save the array to a file
+        np.savetxt('LidarUsedToMask.txt', ptc_xyz_lidar_normed, fmt='%.4f')
+        # Save the array to a file
+        np.savetxt('CameraCorners.txt', camera_corners_lid_normed, fmt='%.4f')
 
         #4
         # Capture all points within the bounding box
@@ -175,7 +183,7 @@ class Lidar2Cam(Node):
                             (ptc_xyz_lidar_normed[:,1]<=camera_corners_lid_normed[1,offset + 2]))) #y<=bottom
                             # Space for Optimization here
             
-        ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
+        # ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
 
 
         # ---------------------------------------------------------------------------- #
@@ -184,8 +192,12 @@ class Lidar2Cam(Node):
         image = self.img_tocv2(self.img_msg) 
         translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
         ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_stacked
+        ptc_xyz_camera_filtered = self.camera_info @ ptc_xyz_camera_filtered
         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
-        # ptc_xyz_lidar#[mask]
+        ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
+        ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
+        ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask]
+        print("mask: ", mask)
         
         border_size=300
         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
@@ -195,10 +207,10 @@ class Lidar2Cam(Node):
         ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
         ptc_z_camera=ptc_z_camera.astype(np.uint8)
         color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
-        r=ptc_xyz_lidar_filtered.shape[0]
+        r=ptc_xyz_camera_filtered.shape[0]
         print(r)
         for j in range(r):
-            i=ptc_xyz_lidar_filtered[j]
+            i=ptc_xyz_camera_filtered[j]
             c=color[np.newaxis,np.newaxis,j,0]
             a = int(np.floor(i[0]) + border_size)
             b = int(np.floor(i[1]) + border_size)

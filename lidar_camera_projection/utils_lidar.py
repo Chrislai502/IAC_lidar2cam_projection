@@ -7,7 +7,7 @@ import math
 
 # ------ Converts pointclouds(in camera frame) to spherical Coordinates ------ # (Spherical coordinates following Wikipedia definition here: https://en.wikipedia.org/wiki/Spherical_coordinate_system)
 # Output points are in degrees
-def xyz2spherical(self, ptc_arr):
+def xyz2spherical(ptc_arr):
     def cartesian_to_spherical(xyz):
         x, y, z = xyz # in camera frame
         rho   = math.sqrt(x**2 + y**2 + z**2)
@@ -47,7 +47,7 @@ def xyz2spherical(self, ptc_arr):
     return np.array(list(map(lambda x: cartesian_to_spherical(x), ptc_arr)))
 
 # --------------- Converts Spherical Coordinates to Pointcloud in Camera Frame -------------- #
-def spherical2xyz(self, spr_arr):
+def spherical2xyz(spr_arr):
     def spherical_to_cartesian(spr):
         phi, theta, rho = spr
         x = rho * math.sin(theta) * math.cos(phi)
@@ -60,7 +60,7 @@ def spherical2xyz(self, spr_arr):
 
 # ---- Converts bbox coordinate format from (centerpoint, size_x, size_y) ---- #
 # ------------------- to (top_y, bottom_y, left_x, right_x) ------------------ #
-def box_to_corners(self, cx, cy, width, height):
+def box_to_corners(cx, cy, width, height):
     half_width = width / 2
     half_height = height / 2
 
@@ -72,14 +72,14 @@ def box_to_corners(self, cx, cy, width, height):
     return (y1, y2, x1, x2) #(up, down, left, right)
 
 # Helper function that convert list of boxes to a matrix
-def boxes_to_matirx(self, boxes): 
+def boxes_to_matirx(boxes): 
     '''
     Helper function that convert list of boxes to a matrix
     '''
     mat_return = np.empty((3, 0))
     for box_msg in boxes:
         # print("Infunc: ", box_msg)
-        top, bot, left, right = self.box_to_corners(box_msg.center.x, box_msg.center.y, box_msg.size_x, box_msg.size_y)
+        top, bot, left, right = box_to_corners(box_msg.center.x, box_msg.center.y, box_msg.size_x, box_msg.size_y)
         mat = np.array([[left, right, right, left], 
                         [top,  top,   bot,   bot], 
                         [1 , 1 , 1 , 1 ]]) # (4x3 camera corner matrix)

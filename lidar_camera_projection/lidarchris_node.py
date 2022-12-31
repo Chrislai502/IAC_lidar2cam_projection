@@ -352,19 +352,22 @@ class Lidar2Cam(Node):
         R_inv = inv(self.RotMat_luminar_front2_flc) 
         numboxes = 1
         translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), 4*numboxes)
-        camera_corners_lid = R_inv @ camera_corners_cam - translation_stacked
+        camera_corners_cam = camera_corners_cam - translation_stacked
+        camera_corners_lid = R_inv @ camera_corners_cam
 
         #3
         # Normalize all points on their Z-axis
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)
-        ptc_xyz_lidar_normed = ptc_xyz_lidar / ptc_xyz_lidar[:, 2].reshape(-1, 1)
-        # ptc_z_camera = ptc_xyz_camera_real_px[:, 2]
-        # np.divide(ptc_xyz_camera_real_px, ptc_z_camera.reshape(ptc_xyz_camera_real_px.shape[0], 1))
+        # ptc_xyz_lidar_normed = ptc_xyz_lidar / ptc_xyz_lidar[:, 2].reshape(-1, 1) # Division by 0 occured
+        print("ptc_xyz_lidar: ", ptc_xyz_lidar.shape)
+        ptc_z_camera = ptc_xyz_lidar[:, 2]
+        ptc_xyz_lidar_normed = np.divide(ptc_xyz_lidar, ptc_z_camera.reshape(ptc_xyz_lidar.shape[0], 1))
 
         #4
         # Capture all points within the bounding box
-        for i in camera_corners_lid.shape[1]: #(Columns as size)
+        mask = np.full((ptc_xyz_lidar_normed.shape[0],), False)
+        for i in range(1):#camera_corners_lid.shape[1]): #(Columns as size)
             offset = 3*i
             mask = (mask | ((ptc_xyz_lidar_normed[:,0]>=camera_corners_lid[0,offset]) & # x>=left
                             (ptc_xyz_lidar_normed[:,0]<=camera_corners_lid[0,offset + 1]) & # x<=right

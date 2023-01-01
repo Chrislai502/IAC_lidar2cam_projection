@@ -32,6 +32,7 @@ class Lidar2Cam(Node):
         self.point_cloud_msg = None
         self.bbox_msg = None # Initialize an empty array
         self.img_msg = None
+        self.roi=None
 
         # ---------------------------------------------------------------------------- #
         #         All the Hard Coded Matrices Applies to Front Left Camera ONLY        #
@@ -143,34 +144,46 @@ class Lidar2Cam(Node):
         
         #1
         K_inv = inv(self.camera_info)
-        # print(self.bbox_msg)
-        image = self.img_tocv2(self.img_msg)
-        min_x,min_y,w,h=cv2.selectROI('roi',image,False,False)
-        cv2.waitKey(0)
-        bbox_matrix=np.array([[min_x,min_x+w],[min_y,min_y+h],[1,1]])
-        # camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg])
-        camera_corners_cam = K_inv @ bbox_matrix
-        print(camera_corners_cam.shape)
-        # camera_corners_cam=camera_corners_cam[:,[1,3]]
-        # print(camera_corners_cam.shape)
+        test=False
+        if test:
+            image = self.img_tocv2(self.img_msg)
+            if self.roi is None:
+                min_x,min_y,w,h=cv2.selectROI('roi',image,False,False)
+                cv2.waitKey(0)
+                bbox_matrix=np.array([[min_x+w,min_x],[min_y+h,min_y],[1,1]])
+                self.roi=bbox_matrix            
+            # print(boxes_to_matirx([self.bbox_msg]))
+            # print(self.roi)
+            # print(K_inv @ boxes_to_matirx([self.bbox_msg]))
+            # print(K_inv @ self.roi)
+            camera_corners_cam = K_inv @ self.roi
+        else:
+            camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg])
+            camera_corners_cam=camera_corners_cam[:,[2,0]]
         
         #2
         # Apply Inverse rotation matrix
         R_inv = inv(self.RotMat_luminar_front2_flc) 
         numboxes = 1
         # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), 4*numboxes)
-        camera_corners_cam = camera_corners_cam - self.translation_luminar_front2_flc[:,np.newaxis]
         camera_corners_lid = R_inv @ camera_corners_cam # This row will make the bottom row not necessarily zero
+        # tmp=self.RotMat_luminar_front2_flc@(camera_corners_lid-trans[:,np.newaxis])+self.translation_luminar_front2_flc[:,np.newaxis]
+        # print(camera_corners_cam-tmp)
+        camera_corners_lid_z = camera_corners_lid[0]
         # print(camera_corners_lid)
-        camera_corners_lid_z = camera_corners_lid[0, :]
-        camera_corners_lid_normed = (camera_corners_lid[1:]/camera_corners_lid_z).T
-        print(camera_corners_lid_normed)
+        camera_corners_lid_normed = camera_corners_lid/camera_corners_lid_z
+        # print(camera_corners_lid_normed)
+        # camera_corners_lid_normed = (camera_corners_lid_normed - trans[:,np.newaxis]).T
+        # print(camera_corners_lid_normed)
+        camera_corners_lid_normed=camera_corners_lid_normed[1:].T
 
 
         #3
         # Normalize all points on their Z-axis
+        trans=R_inv@self.translation_luminar_front2_flc
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
+        ptc_xyz_lidar-=trans[np.newaxis,:]
         ptc_z_camera = ptc_xyz_lidar[:, 0].reshape((-1, 1))
         ptc_xyz_lidar_normed = ptc_xyz_lidar[:,1:]/ptc_z_camera
         print(ptc_xyz_lidar_normed.shape,np.min(ptc_xyz_lidar_normed,0),np.max(ptc_xyz_lidar_normed,0))
@@ -187,8 +200,8 @@ class Lidar2Cam(Node):
             offset = 3*i
             mask = (mask | ((ptc_xyz_lidar_normed[:,0]>=camera_corners_lid_normed[0,0]) & # x>=left
                             (ptc_xyz_lidar_normed[:,0]<=camera_corners_lid_normed[1,0]) & # x<=right
-                            (ptc_xyz_lidar_normed[:,1]>=camera_corners_lid_normed[1,1]) & #y>=top
-                            (ptc_xyz_lidar_normed[:,1]<=camera_corners_lid_normed[0,1]))) #y<=bottom
+                            (ptc_xyz_lidar_normed[:,1]>=camera_corners_lid_normed[0,1]) & #y>=top
+                            (ptc_xyz_lidar_normed[:,1]<=camera_corners_lid_normed[1,1]))) #y<=bottom
                             # Space for Optimization here
             
         # ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
@@ -199,13 +212,16 @@ class Lidar2Cam(Node):
         #                  Reflecting the points on the labelled image                 #
         # ---------------------------------------------------------------------------- #
         image = self.img_tocv2(self.img_msg) 
-        translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
-        ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + translation_stacked
+        # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
+        ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
+        ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
+        ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + self.translation_luminar_front2_flc[:,np.newaxis]
         ptc_xyz_camera_filtered = self.camera_info @ ptc_xyz_camera_filtered
         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
+        ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask]
         ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
-        ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask]
+        
         # print("mask: ", np.any( mask))
         
         border_size=300
@@ -213,11 +229,11 @@ class Lidar2Cam(Node):
 
         z_min=np.min(ptc_z_camera)
         z_range=np.max(ptc_z_camera)-z_min
+        print(z_min,z_range)
         ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
         ptc_z_camera=ptc_z_camera.astype(np.uint8)
         color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
         r=ptc_xyz_camera_filtered.shape[0]
-        print(r)
         for j in range(r):
             i=ptc_xyz_camera_filtered[j]
             c=color[np.newaxis,np.newaxis,j,0]

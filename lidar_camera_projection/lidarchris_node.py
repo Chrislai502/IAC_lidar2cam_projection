@@ -100,21 +100,21 @@ class Lidar2Cam(Node):
     #                     Callback Functions for Subscriptions                     #
     # ---------------------------------------------------------------------------- #
     def img_callback(self, msg):
-        print("I")
+        # print("I")
         self.img_msg = msg
 
     def bbox_callback(self, msg):
-        print("B")
+        # print("B")
         self.bbox_msg = msg
         if self.point_cloud_msg is not None:
-            print("+")
+            # print("+")
             self.bbox_ptc_callback()
 
     def point_cloud_callback(self, msg):
-        print("P")
+        # print("P")
         self.point_cloud_msg = msg
         if self.bbox_msg is not None:
-            print("+")
+            # print("+")
             self.bbox_ptc_callback()
 
     # ---------------------------------------------------------------------------- #
@@ -143,29 +143,37 @@ class Lidar2Cam(Node):
         
         #1
         K_inv = inv(self.camera_info)
-        print(self.bbox_msg)
-        camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg])
-        print(camera_corners_cam)
+        # print(self.bbox_msg)
+        image = self.img_tocv2(self.img_msg)
+        min_x,min_y,w,h=cv2.selectROI('roi',image,False,False)
+        cv2.waitKey(0)
+        bbox_matrix=np.array([[min_x,min_x+w],[min_y,min_y+h],[1,1]])
+        # camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg])
+        camera_corners_cam = K_inv @ bbox_matrix
+        print(camera_corners_cam.shape)
+        # camera_corners_cam=camera_corners_cam[:,[1,3]]
+        # print(camera_corners_cam.shape)
         
         #2
         # Apply Inverse rotation matrix
         R_inv = inv(self.RotMat_luminar_front2_flc) 
         numboxes = 1
-        translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), 4*numboxes)
-        camera_corners_cam = camera_corners_cam - translation_stacked
+        # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((3, 1)), 4*numboxes)
+        camera_corners_cam = camera_corners_cam - self.translation_luminar_front2_flc[:,np.newaxis]
         camera_corners_lid = R_inv @ camera_corners_cam # This row will make the bottom row not necessarily zero
-        camera_corners_lid_z = camera_corners_lid[2, :]
-        camera_corners_lid_normed = camera_corners_lid/camera_corners_lid_z
-
-
+        # print(camera_corners_lid)
+        camera_corners_lid_z = camera_corners_lid[0, :]
+        camera_corners_lid_normed = (camera_corners_lid[1:]/camera_corners_lid_z).T
+        print(camera_corners_lid_normed)
 
 
         #3
         # Normalize all points on their Z-axis
         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
-        ptc_z_camera = ptc_xyz_lidar[:, 2].reshape((-1, 1))
-        ptc_xyz_lidar_normed = ptc_xyz_lidar/ptc_z_camera
+        ptc_z_camera = ptc_xyz_lidar[:, 0].reshape((-1, 1))
+        ptc_xyz_lidar_normed = ptc_xyz_lidar[:,1:]/ptc_z_camera
+        print(ptc_xyz_lidar_normed.shape,np.min(ptc_xyz_lidar_normed,0),np.max(ptc_xyz_lidar_normed,0))
 
         # Save the array to a file
         np.savetxt('LidarUsedToMask.txt', ptc_xyz_lidar_normed, fmt='%.4f')
@@ -177,13 +185,14 @@ class Lidar2Cam(Node):
         mask = np.full((ptc_xyz_lidar_normed.shape[0],), False)
         for i in range(1):#camera_corners_lid.shape[1]): #(Columns as size)
             offset = 3*i
-            mask = (mask | ((ptc_xyz_lidar_normed[:,0]>=camera_corners_lid_normed[0,offset]) & # x>=left
-                            (ptc_xyz_lidar_normed[:,0]<=camera_corners_lid_normed[0,offset + 1]) & # x<=right
-                            (ptc_xyz_lidar_normed[:,1]>=camera_corners_lid_normed[1,offset + 1]) & #y>=top
-                            (ptc_xyz_lidar_normed[:,1]<=camera_corners_lid_normed[1,offset + 2]))) #y<=bottom
+            mask = (mask | ((ptc_xyz_lidar_normed[:,0]>=camera_corners_lid_normed[0,0]) & # x>=left
+                            (ptc_xyz_lidar_normed[:,0]<=camera_corners_lid_normed[1,0]) & # x<=right
+                            (ptc_xyz_lidar_normed[:,1]>=camera_corners_lid_normed[1,1]) & #y>=top
+                            (ptc_xyz_lidar_normed[:,1]<=camera_corners_lid_normed[0,1]))) #y<=bottom
                             # Space for Optimization here
             
         # ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
+        print(np.sum(mask))
 
 
         # ---------------------------------------------------------------------------- #
@@ -197,7 +206,7 @@ class Lidar2Cam(Node):
         ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask]
-        print("mask: ", mask)
+        # print("mask: ", np.any( mask))
         
         border_size=300
         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
@@ -226,7 +235,6 @@ class Lidar2Cam(Node):
 
         # Publishing the Image and PointCloud
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
-
         # # ---------------------------------------------------------------------------- #
         # #                                   Custering                                  #
         # # ---------------------------------------------------------------------------- #

@@ -28,6 +28,12 @@ class Lidar2Cam(Node):
         super().__init__('lidar_to_cam_node')
         self.bridge = CvBridge()
 
+        # ---------------------------------------------------------------------------- #
+        #                                  Parameters                                  #
+        # ---------------------------------------------------------------------------- #
+        self.time_threshold = 0.01 # 10ms
+        # ------------------------------ End Parameters ------------------------------ #
+
         # Point Clouds
         self.front_cloud_msg = None
         self.left_cloud_msg  = None
@@ -148,36 +154,32 @@ class Lidar2Cam(Node):
     # ---------------------------------------------------------------------------- #
     #                     Callback Functions for Subscriptions                     #
     # ---------------------------------------------------------------------------- #
-    # ----------- If all of the buffers are filled, execute_projection. ---------- #
+    '''
+    No matter what is received first, the execute_projection function will be executed.
+    We will have a replacement policy, updating the buffers with the latest messages only.
+    Wait till all the buffers are filled before doing the execution.
+    '''
     # ------------------------------ YOLO Detection ------------------------------ #
     def YOLO_callback(self, msg):
         # print("B")
         self.bboxes_array_msg = msg
-        if np.all([self.front_cloud_msg, self.left_cloud_msg, self.right_cloud_msg]) is not None:
-            # print("+")
-            self.execute_projection()
+        self.execute_projection()
 
     # -------------------------------- PointClouds ------------------------------- #
     def front_cloud_callback(self, msg):
         # print("P")
         self.front_cloud_msg = msg
-        if np.all([self.bboxes_array_msg, self.left_cloud_msg, self.right_cloud_msg]) is not None:
-            # print("+")
-            self.execute_projection()
+        self.execute_projection()
 
     def left_cloud_callback(self, msg):
         # print("P")
         self.left_cloud_msg = msg
-        if np.all([self.front_cloud_msg, self.bboxes_array_msg, self.right_cloud_msg]) is not None:
-            # print("+")
-            self.execute_projection()
+        self.execute_projection()
 
     def right_cloud_callback(self, msg):
         # print("P")
         self.right_cloud_msg = msg
-        if np.all([self.front_cloud_msg, self.left_cloud_msg, self.bboxes_array_msg]) is not None:
-            # print("+")
-            self.execute_projection()
+        self.execute_projection()
 
     # # ---------------------------------------------------------------------------- #
     # #         Helper Functions for Projection Calculation and Visualization        #
@@ -195,7 +197,7 @@ class Lidar2Cam(Node):
     # ---------------------------------------------------------------------------- #
     def execute_projection(self):
         '''
-        1. Check if the timestamps are in sync. It not, return some sort of error
+        1. Check if the timestamps are in sync.
 
         Plan to do the new projection:
         2. Transform this into Lidar Frame
@@ -207,11 +209,35 @@ class Lidar2Cam(Node):
         # #1
         # K_inv = inv(self.camera_info)
         # camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg],0)
-        #1
-        if 
         
+        #1
+        # Check the buffer is filled (Potential issue: if any of the messages are not received, the projection will not happen)
+        if self.bboxes_array_msg is None or self.front_cloud_msg is None or self.left_cloud_msg is None or self.right_cloud_msg is None:
+            return
+        #1.1
+        # Timestamp check
+        do_left, do_right, do_front = False, False, False
+        if abs(self.bboxes_array_msg.header.stamp - self.front_cloud_msg.header.stamp) <= self.time_threshold:
+            do_front = True
+        if abs(self.bboxes_array_msg.header.stamp - self.left_cloud_msg.header.stamp) <= self.time_threshold:
+            do_left = True
+        if abs(self.bboxes_array_msg.header.stamp - self.right_cloud_msg.header.stamp) <= self.time_threshold:
+            do_right = True
+
         #2
-        # Apply Inverse rotation matrix
+        # Apply Inverse rotation matrix on only the Lidar-Camera Pairs that are in sync
+        '''
+        Reminder here that the lidar-camera pairs are:
+            Front Lidar -> Front Left Center Camera
+            Front Lidar -> Front Right Center Camera
+            Front Lidar -> Front Left Camera
+            Front Lidar -> Front Right Camera
+            Left Lidar  -> Front Left Camera
+            Left Lidar  -> Rear Left Camera
+            Right Lidar -> Front Right Camera
+            Right Lidar -> Rear Right Camera
+        '''
+        # Check what are the existing camera Images Available
         R_inv = inv(self.RotMat_luminar_front2_flc) 
         camera_corners_lid = R_inv @ camera_corners_cam # This operation will make the bottom row not necessarily zero
         camera_corners_lid_z = camera_corners_lid[:,0:1]

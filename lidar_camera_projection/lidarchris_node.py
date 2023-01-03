@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
-from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D #, BoundingBox2DArray
+from vision_msgs.msg import Detection2DArray, Detection2D #BoundingBox3D, BoundingBox2D, BoundingBox2DArray
 from builtin_interfaces.msg import Duration
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2, PointField, Image
@@ -27,30 +27,59 @@ class Lidar2Cam(Node):
         print("Initialized Lidar2Cam Node!")
         super().__init__('lidar_to_cam_node')
         self.bridge = CvBridge()
-        self.point_cloud_msg = None
-        self.bbox_msg = None # Initialize an empty array
-        self.img_msg = None
-        self.roi=None
+
+        # Point Clouds
+        self.front_cloud_msg = None
+        self.left_cloud_msg  = None
+        self.right_cloud_msg = None
+        
+        # Bbox Array
+        self.bboxes_array_msg = None
+        # self.img_msg = None
+        # self.roi=None
 
         # ---------------------------------------------------------------------------- #
-        #         All the Hard Coded Matrices Applies to Front Left Camera ONLY        #
+        #         No more Camera Matrix Because the YOLO Node will Deal With it        #
         # ---------------------------------------------------------------------------- #
-        self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
-                                     [0.000000, 1731.274561, 295.484988], 
-                                     [0.000000, 0.000000, 1.000000*2]])*0.5
-        # self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
-        #                              [0.000000, 1731.274561, 295.484988], 
-        #                              [0.000000, 0.000000, 1.000000]])
-        print(self.camera_info)
-
+        '''
+        For this current attempt of synchronization, 
+        We first Synchronize the 3 Lidar Point Clouds:
+            1. Fill out the three Lidar buffers.
+            2. Then, we will get the latest Point Cloud timestame and compare that
+                with the earliest timestamp in the Detection2DArray.
+            3. If the timestamp is within 10ms, we will proceed output the detection.
+            4. If not, we will output an error (for the tracker) and wait for the next detection.
+        '''
         # ---------------------------------------------------------------------------- #
         #                      Calibrated Transformation Matrices                      #
         # ---------------------------------------------------------------------------- #
-        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156])
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Front Lidar to Front Left Center Camera
+        self.translation_luminar_left2_flc  = np.array([ 0.017, -0.016, 0.156]) # Front Lidar to Front Right Center Camera
+        self.translation_luminar_right2_flc = np.array([ 0.017, -0.016, 0.156]) # Front Lidar to Front Left Camera
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Front Lidar to Front Right Camera
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Left Lidar to Front Left Camera
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Left Lidar to Rear Left Camera
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Right Lidar to Front Right Camera
+        self.translation_luminar_front2_flc = np.array([ 0.017, -0.016, 0.156]) # Right Lidar to Rear Right Camera
         self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
                                                     [ 0.05990699,  0.00453683, -0.99819365],
                                                     [ 0.9979756,   0.02111691,  0.05998988]])
-
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
+                                                    [ 0.9979756,   0.02111691,  0.05998988]])                                            
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
+                                                    [ 0.9979756,   0.02111691,  0.05998988]])
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
+                                                    [ 0.9979756,   0.02111691,  0.05998988]])         
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
+                                                    [ 0.9979756,   0.02111691,  0.05998988]])
+        self.RotMat_luminar_front2_flc = np.array([[ 0.02135093, -0.99976672, -0.00326259],
+                                                    [ 0.05990699,  0.00453683, -0.99819365],
+                                                    [ 0.9979756,   0.02111691,  0.05998988]])                                                                                                                                                   
+        
         # ---------------------------------------------------------------------------- #
         #                                  QOS Profile                                 #
         # ---------------------------------------------------------------------------- #
@@ -64,102 +93,122 @@ class Lidar2Cam(Node):
         #                                 Subscriptions                                #
         # ---------------------------------------------------------------------------- #
         
-        # LIDAR PointCloud ----------------------------- #
-        self.pointcloud_sub = self.create_subscription(
+        # Front LIDAR PointCloud ----------------------------- #
+        self.front_pointcloud_sub = self.create_subscription(
             msg_type    = PointCloud2,
             topic       = '/luminar_front_points',
-            callback    = self.point_cloud_callback,
+            callback    = self.front_cloud_callback,
             qos_profile = self.qos_profile
         )
-        self.pointcloud_sub  # prevent unused variable warning
+        self.front_pointcloud_sub  # prevent unused variable warning
 
-        # Bounding Box ---------------------------------- #
+        # Left LIDAR PointCloud ----------------------------- #
+        self.left_pointcloud_sub = self.create_subscription(
+            msg_type    = PointCloud2,
+            topic       = '/luminar_left_points',
+            callback    = self.left_cloud_callback,
+            qos_profile = self.qos_profile
+        )
+        self.left_pointcloud_sub  # prevent unused variable warning
+
+        # Right LIDAR PointCloud ----------------------------- #
+        self.right_pointcloud_sub = self.create_subscription(
+            msg_type    = PointCloud2,
+            topic       = '/luminar_right_points',
+            callback    = self.right_cloud_callback,
+            qos_profile = self.qos_profile
+        )
+        self.right_pointcloud_sub  # prevent unused variable warning
+
+        # YOLO Detection2DArray Subscription ---------------------------------- #
         self.image_sub = self.create_subscription(
-            msg_type    = BoundingBox2D, 
+            msg_type    = Detection2DArray, 
             topic       = 'vimba_front_left_center/out/objects',
-            callback    = self.bbox_callback,
+            callback    = self.YOLO_callback,
             qos_profile = self.qos_profile
         )
         self.image_sub # prevent unused variable warning
 
-        # YOLO BBOX Image ---------------------------------- #
-        self.image_sub = self.create_subscription(
-            msg_type    = Image,
-            topic       = 'vimba_front_left_center/out/image',
-            callback    = self.img_callback,
-            qos_profile = self.qos_profile
-        )
-        self.image_sub # prevent unused variable warning
+        # # YOLO BBOX Image ---------------------------------- #
+        # self.image_sub = self.create_subscription(
+        #     msg_type    = Image,
+        #     topic       = 'vimba_front_left_center/out/image',
+        #     callback    = self.img_callback,
+        #     qos_profile = self.qos_profile
+        # )
+        # self.image_sub # prevent unused variable warning
 
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
         # ---------------------------------------------------------------------------- #
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
-        self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
+        # self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
 
 
     # ---------------------------------------------------------------------------- #
     #                     Callback Functions for Subscriptions                     #
     # ---------------------------------------------------------------------------- #
-    def img_callback(self, msg):
-        # print("I")
-        self.img_msg = msg
-
-    def bbox_callback(self, msg):
+    # ----------- If all of the buffers are filled, execute_projection. ---------- #
+    # ------------------------------ YOLO Detection ------------------------------ #
+    def YOLO_callback(self, msg):
         # print("B")
-        self.bbox_msg = msg
-        if self.point_cloud_msg is not None:
+        self.bboxes_array_msg = msg
+        if np.all([self.front_cloud_msg, self.left_cloud_msg, self.right_cloud_msg]) is not None:
             # print("+")
-            self.bbox_ptc_callback()
+            self.execute_projection()
 
-    def point_cloud_callback(self, msg):
+    # -------------------------------- PointClouds ------------------------------- #
+    def front_cloud_callback(self, msg):
         # print("P")
-        self.point_cloud_msg = msg
-        if self.bbox_msg is not None:
+        self.front_cloud_msg = msg
+        if np.all([self.bboxes_array_msg, self.left_cloud_msg, self.right_cloud_msg]) is not None:
             # print("+")
-            self.bbox_ptc_callback()
+            self.execute_projection()
 
-    # ---------------------------------------------------------------------------- #
-    #         Helper Functions for Projection Calculation and Visualization        #
-    # ---------------------------------------------------------------------------- #
-    def img_tocv2(self, message):
-        try:
-            # Convert the ROS2 Image message to a NumPy array
-            image = self.bridge.imgmsg_to_cv2(message, "bgr8")
-        except CvBridgeError as e:
-            print(e)
-        return image
+    def left_cloud_callback(self, msg):
+        # print("P")
+        self.left_cloud_msg = msg
+        if np.all([self.front_cloud_msg, self.bboxes_array_msg, self.right_cloud_msg]) is not None:
+            # print("+")
+            self.execute_projection()
+
+    def right_cloud_callback(self, msg):
+        # print("P")
+        self.right_cloud_msg = msg
+        if np.all([self.front_cloud_msg, self.left_cloud_msg, self.bboxes_array_msg]) is not None:
+            # print("+")
+            self.execute_projection()
+
+    # # ---------------------------------------------------------------------------- #
+    # #         Helper Functions for Projection Calculation and Visualization        #
+    # # ---------------------------------------------------------------------------- #
+    # def img_tocv2(self, message):
+    #     try:
+    #         # Convert the ROS2 Image message to a NumPy array
+    #         image = self.bridge.imgmsg_to_cv2(message, "bgr8")
+    #     except CvBridgeError as e:
+    #         print(e)
+    #     return image
 
     # ---------------------------------------------------------------------------- #
     #                Inverse Lidar camera projection right here                    #
     # ---------------------------------------------------------------------------- #
-    def bbox_ptc_callback(self):
+    def execute_projection(self):
         '''
+        1. Check if the timestamps are in sync. It not, return some sort of error
+
         Plan to do the new projection:
-        1. Apply inverse K matrix onto bbox corners
         2. Transform this into Lidar Frame
         3. Normalize all Lidar Points on their Z-axis
         4. capture all points within the bounding box
         5. Convert bounding box corners into lidar frame 
         '''
         
+        # #1
+        # K_inv = inv(self.camera_info)
+        # camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg],0)
         #1
-        K_inv = inv(self.camera_info)
-        # test=True
-        # if test:
-        #     image = self.img_tocv2(self.img_msg)
-        #     if self.roi is None:
-        #         min_x,min_y,w,h=cv2.selectROI('roi',image,False,False)
-        #         cv2.waitKey(0)
-        #         bbox_matrix=np.array([[min_x+w,min_x],[min_y+h,min_y],[1,1]])[np.newaxis]
-        #         self.roi=bbox_matrix            
-        #     # print(boxes_to_matirx([self.bbox_msg]))
-        #     # print(self.roi)
-        #     # print(K_inv @ boxes_to_matirx([self.bbox_msg]))
-        #     # print(K_inv @ self.roi)
-        #     camera_corners_cam = K_inv @ self.roi
-        # else:
-        camera_corners_cam = K_inv @ boxes_to_matirx([self.bbox_msg],0)
+        if 
         
         #2
         # Apply Inverse rotation matrix
@@ -216,10 +265,7 @@ class Lidar2Cam(Node):
         )
         max_label = labels.max()
         print('label num:',max_label+1)
-        # if max_label==-1:
-        #     self.image_msg = None
-        #     self.point_cloud_msg = None 
-        #     return
+
         # ---------------------------------------------------------------------------- #
         #                                Calculate 3D BBox                             #
         # ---------------------------------------------------------------------------- #
@@ -232,9 +278,7 @@ class Lidar2Cam(Node):
                 cluster_bbox=cluster.get_oriented_bounding_box()
             else:
                 cluster_bbox=cluster.get_axis_aligned_bounding_box()
-            # print(len(cluster_bbox.get_point_indices_within_bounding_box(o3d.utility.Vector3dVector(ptc_xyz_camera_list))))
             median_xyz_camera.append([cluster_bbox,abs(cluster_bbox.get_center()[0]),i])
-            # print(cluster_bbox)
         median_xyz_camera.sort(key=lambda x:x[1])
         if max_label>-1:
             print('label choosed:',median_xyz_camera[0][2],'distance:',median_xyz_camera[0][1])
@@ -287,7 +331,6 @@ class Lidar2Cam(Node):
         if self.img_msg  is not None:
             if max_label>=0:
                 image = self.img_tocv2(self.img_msg) 
-                # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
                 ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
                 ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
                 ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + self.translation_luminar_front2_flc[:,np.newaxis]
@@ -303,7 +346,6 @@ class Lidar2Cam(Node):
 
                 z_min=np.min(ptc_z_camera)
                 z_range=np.max(ptc_z_camera)-z_min
-                # print(z_min,z_range)
                 ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
                 ptc_z_camera=ptc_z_camera.astype(np.uint8)
                 color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
@@ -318,10 +360,6 @@ class Lidar2Cam(Node):
                             image_undistorted[b-1:b+2,a-1:a+2] = c
                         except:
                             continue
-
-                # for i in ptc_xyz_camera[mask]:
-                #     image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
-                #     # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
 
                 # Publishing the Image and PointCloud
                 self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))

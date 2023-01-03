@@ -22,6 +22,19 @@ from .utils_lidar import boxes_to_matirx
 from scipy.spatial.transform import Rotation
 print(os.getcwd())
 
+# map = {:}
+frame_map = {   
+            "vimba_front_left": 1, 
+            "vimba_front_left_center":2,
+            "vimba_front_right_center":3,
+            "vimba_front_right":4,
+            "vimba_rear_right":5,
+            "vimba_rear_left":6,
+            }
+front_lidar_selection = set([1,2,3,4])
+left_lidar_selection  = set([1,6])
+right_lidar_selection = set([4,5])
+
 class Lidar2Cam(Node):
     def __init__(self):
         print("Initialized Lidar2Cam Node!")
@@ -39,7 +52,7 @@ class Lidar2Cam(Node):
         self.left_cloud_msg  = None
         self.right_cloud_msg = None
         
-        # Bbox Array
+        # Bbox Array (Only the ones with Detections)
         self.bboxes_array_msg = None
         # self.img_msg = None
         # self.roi=None
@@ -169,17 +182,14 @@ class Lidar2Cam(Node):
     def front_cloud_callback(self, msg):
         # print("P")
         self.front_cloud_msg = msg
-        self.execute_projection()
 
     def left_cloud_callback(self, msg):
         # print("P")
         self.left_cloud_msg = msg
-        self.execute_projection()
 
     def right_cloud_callback(self, msg):
         # print("P")
         self.right_cloud_msg = msg
-        self.execute_projection()
 
     # # ---------------------------------------------------------------------------- #
     # #         Helper Functions for Projection Calculation and Visualization        #
@@ -237,7 +247,28 @@ class Lidar2Cam(Node):
             Right Lidar -> Front Right Camera
             Right Lidar -> Rear Right Camera
         '''
-        # Check what are the existing camera Images Available
+        # Check what are the existing camera Images Available (Do decision Tree or FSM)
+        cam_list = []
+        for bbox_msg in self.bboxes_array_msg.detections:
+            cam_list.append(frame_map[bbox_msg.frame_id])
+        assert(len(cam_list) != 0 )
+
+        # 2.1 # Check if there is any front lidar camera pair
+        lst_front = list(set(cam_list)&set(front_lidar_selection)) 
+        if len(lst_front)!=0:
+            #Project all these points into the front lidar frame
+            ptc_numpy_record = pointcloud2_to_array(self.front_cloud_msg)
+            ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
+            camera_corners_cam = boxes_to_matirx(keep the args of the intersected points and get their messages)
+        # def intersection(list1, list2):
+        #     return [(i, elem) for i, elem in enumerate(list1) if elem in list2]
+
+        # list1 = [1, 2, 3, 4]
+        # list2 = [3, 4, 5, 6]
+
+        # print(intersection(list1, list2))  # [(2, 3), (3, 4)]
+
+
         R_inv = inv(self.RotMat_luminar_front2_flc) 
         camera_corners_lid = R_inv @ camera_corners_cam # This operation will make the bottom row not necessarily zero
         camera_corners_lid_z = camera_corners_lid[:,0:1]

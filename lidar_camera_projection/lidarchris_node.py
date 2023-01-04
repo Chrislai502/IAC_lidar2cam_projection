@@ -31,6 +31,28 @@ frame_map = {
             "vimba_rear_right":5,
             "vimba_rear_left":6,
             }
+frame_lidar_map = {
+        1: ["front", "left"],
+        2: ["front"],
+        3: ["front"],
+        4: ["front", "right"],
+        5: ["right"],
+        6: ["left"],
+}
+frame_lidar_map = {
+        1: [11, 22],
+        2: [11],
+        3: [11],
+        4: [11, 33],
+        5: [33],
+        6: [22],
+}
+lidar_ID_map = {
+        "front": 11,
+        "left":  22,
+        "right": 33,
+}
+
 front_lidar_selection = set([1,2,3,4])
 left_lidar_selection  = set([1,6])
 right_lidar_selection = set([4,5])
@@ -143,8 +165,7 @@ class Lidar2Cam(Node):
         self.image_sub = self.create_subscription(
             msg_type    = Detection2DArray, 
             topic       = 'vimba_front_left_center/out/objects',
-            callback    = self.YOLO_callback,
-            qos_profile = self.qos_profile
+             qos_profile = self.qos_profile
         )
         self.image_sub # prevent unused variable warning
 
@@ -248,10 +269,13 @@ class Lidar2Cam(Node):
             Right Lidar -> Rear Right Camera
         '''
         # Check what are the existing camera Images Available (Do decision Tree or FSM)
-        cam_list = []
+        cam_list = [] # Dict of CamID and frames needed to compare to
+        lidars_needed = [] # Keep track of the lidar points need to be processed
         for bbox_msg in self.bboxes_array_msg.detections:
             cam_list.append(frame_map[bbox_msg.frame_id])
-        assert(len(cam_list) != 0 )
+        assert(len(cam_list) !=0 )
+
+        # 
 
         # 2.1 # Check if there is any front lidar camera pair
         lst_front = list(set(cam_list)&set(front_lidar_selection)) 
@@ -260,6 +284,7 @@ class Lidar2Cam(Node):
             ptc_numpy_record = pointcloud2_to_array(self.front_cloud_msg)
             ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
             camera_corners_cam = boxes_to_matirx(keep the args of the intersected points and get their messages)
+        
         # def intersection(list1, list2):
         #     return [(i, elem) for i, elem in enumerate(list1) if elem in list2]
 
@@ -268,9 +293,11 @@ class Lidar2Cam(Node):
 
         # print(intersection(list1, list2))  # [(2, 3), (3, 4)]
 
-
+        # Do the inverse first
         R_inv = inv(self.RotMat_luminar_front2_flc) 
+        # Apply the inverse rotation matrix
         camera_corners_lid = R_inv @ camera_corners_cam # This operation will make the bottom row not necessarily zero
+        # The First is the Z-axis of the lidar frame
         camera_corners_lid_z = camera_corners_lid[:,0:1]
         camera_corners_lid_normed = camera_corners_lid[:,1:]/camera_corners_lid_z
         camera_corners_lid_normed=camera_corners_lid_normed.T

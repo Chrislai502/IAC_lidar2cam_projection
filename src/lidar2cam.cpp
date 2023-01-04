@@ -22,14 +22,15 @@
 /* -------------------------------------------------------------------------- */
 using namespace std::chrono_literals;
 
-YOLOv7InferenceNode::Lidar2camNode() : rclcpp::Node("yolov7_inference_node")
+Lidar2camNode::Lidar2camNode() : rclcpp::Node("Lidar2camNode")
 {
-    // TODO: Make _engine_path a launch parameter
-    _engine_path = "/home/roar/ART/perception/model_trials/NVIDIA_AI_IOT_tensorrt_yolov7/yolo_deepstream/tensorrt_yolov7/build/yolov7PTQ.engine";
+    RCLCPP_INFO(this->get_logger(), "Initialized Lidar2Cam Node!");
 
-    // Initialize the YOLOv7 Object
-    _yolov7 = std::make_unique<Yolov7>(_engine_path);
 
+    // Initialize member variables
+    time_threshold_ = std::chrono::duration<double, std::milli>(10);
+    bboxes_array_msg_ = nullptr;
+    
     // Declare a pointer to bgr msgs in CV2 format
     _bgr_imgs = std::make_shared<std::vector<cv::Mat>>();
     // TODO: Relook at how many images you want to store here when generalizing to multiple cameras.

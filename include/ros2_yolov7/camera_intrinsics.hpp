@@ -37,3 +37,64 @@ static const CameraIntrinsics vimba_rear_right_intrinsics = {
     (cv::Mat_<double>(1,5) << -0.192458, 0.059495, -0.000126, 0.000092, 0.000000)
 };
 
+  # ---------------------------------------------------------------------------- #
+        #         No more Camera Matrix Because the YOLO Node will Deal With it        #
+        # ---------------------------------------------------------------------------- #
+        self.cam_matrix[1] = np.array(
+            [[196.296974, -0.307402, 256.633528], [0.000000, 196.203937, 191.920790], [0.000000, 0.000000, 1.000000]])
+        self.cam_matrix[2] = np.array(
+            [[1731.375645, 0.000000, 564.055153], [0.000000, 1728.054397, 290.619860], [0.000000, 0.000000, 1.000000]])
+        self.cam_matrix[3] = np.array(
+            [[1760.474682, 0.000000, 619.440720], [0.000000, 1759.762046, 394.231557], [0.000000, 0.000000, 1.000000]])
+        self.cam_matrix[4] = np.array(
+            [[162.964445, 2.217544, 255.811038], [0.000000, 163.123969, 192.409497], [0.000000, 0.000000, 1.000000]])
+        self.cam_matrix[5] = np.array(
+            [[189.189981, -14.738140, 257.995696], [0.000000, 191.503315, 174.894545], [0.000000, 0.000000, 1.000000]])
+        self.cam_matrix[6] = np.array(
+            [[172.786842, 1.411124, 255.612286], [0.000000, 170.205329, 195.844222], [0.000000, 0.000000, 1.000000]])
+
+        # ---------------------------------------------------------------------------- #
+        #                        Original Transformation Matrices                      #
+        # ---------------------------------------------------------------------------- #
+        self.translation[(2, 1)] = np.array([0.121, -0.026, 0.007])  # Front Lidar to Front Left Center Camera
+        self.translation[(3, 1)] = np.array([-0.121, -0.026, 0.007])  # Front Lidar to Front Right Center Camera
+        self.translation[(1, 1)] = np.array([0.146, -0.026, -0.107])  # Front Lidar to Front Left Camera
+        self.translation[(4, 1)] = np.array([-0.146, -0.026, -0.107])  # Front Lidar to Front Right Camera
+        self.translation[(1, 2)] = np.array([-0.575, -0.121, -0.286])  # Left Lidar to Front Left Camera
+        self.translation[(6, 2)] = np.array([0.140, -0.000, 0.048])  # Left Lidar to Rear Left Camera
+        self.translation[(4, 3)] = np.array([0.575, -0.121, -0.286])  # Right Lidar to Front Right Camera
+        self.translation[(5, 3)] = np.array([-0.140, -0.000, 0.048])  # Right Lidar to Rear Right Camera
+        self.RotMat[(2, 1)] = Rotation.from_quat([0.496, -0.496, 0.504, 0.504]).as_matrix()
+        self.RotMat[(3, 1)] = Rotation.from_quat([0.496, -0.496, 0.504, 0.504]).as_matrix()
+        self.RotMat[(1, 1)] = Rotation.from_quat([0.672, -0.207, 0.219, 0.676]).as_matrix()
+        self.RotMat[(4, 1)] = Rotation.from_quat([0.207, -0.673, 0.676, 0.219]).as_matrix()
+        self.RotMat[(1, 2)] = Rotation.from_quat([-0.153, 0.690, -0.690, -0.153]).as_matrix()
+        self.RotMat[(6, 2)] = Rotation.from_quat([0.542, -0.455, 0.455, 0.542]).as_matrix()
+        self.RotMat[(4, 3)] = Rotation.from_quat([0.689, -0.160, 0.146, 0.692]).as_matrix()
+        self.RotMat[(5, 3)] = Rotation.from_quat([-0.457, 0.548, -0.535, -0.452]).as_matrix()
+
+        # ---------------------------------------------------------------------------- #
+        #                      Calibrated Transformation Matrices                      #
+        # ---------------------------------------------------------------------------- #
+        self.translation[(2, 1)] += np.array([0.0000, 0.0000, -0.0480])  # Front Lidar to Front Left Center Camera
+        self.translation[(3, 1)] += np.array([-0.0200, 0.1430, 0.0070])  # Front Lidar to Front Right Center Camera
+        self.translation[(1, 1)] += np.array([0.0000, 0.0000, -0.1500])  # Front Lidar to Front Left Camera
+        self.translation[(4, 1)] += np.array([0.0000, 0.0000, 0.0000])  # Front Lidar to Front Right Camera
+        # self.translation[(1, 2)] = np.array([-0.575, -0.121, -0.286])  # Left Lidar to Front Left Camera
+        self.translation[(6, 2)] += np.array([0.0000, 0.0000, 0.1430])  # Left Lidar to Rear Left Camera
+        # self.translation[(4, 3)] = np.array([0.575, -0.121, -0.286])  # Right Lidar to Front Right Camera
+        self.translation[(5, 3)] += np.array([0.0270, -0.0340, 0.0000])  # Right Lidar to Rear Right Camera
+        self.RotMat[(2, 1)] = np.array(
+            [[0.9998, -0.0018, 0.0176], [0.0018, 0.9992, 0.0400], [-0.0176, -0.0400, 0.9990]])@self.RotMat[(2, 1)]
+        self.RotMat[(3, 1)] = np.array(
+            [[0.9951, -0.0024, -0.0986], [0.0000, 0.9997, -0.0244], [0.0986, 0.0243, 0.9948]])@self.RotMat[(3, 1)]
+        self.RotMat[(1, 1)] = np.array(
+            [[0.9998, 0.0059, 0.0203], [-0.0059, 1.0000, 0.0015], [-0.0202, -0.0016, 0.9998]])@self.RotMat[(1, 1)]
+        self.RotMat[(4, 1)] = np.array(
+            [[0.9988, -0.0422, 0.0239], [0.0427, 0.9988, -0.0238], [-0.0229, 0.0248, 0.9994]])@self.RotMat[(4, 1)]
+        # self.RotMat[(1, 2)] = Rotation.from_quat([-0.153, 0.690, -0.690, -0.153]).as_matrix()
+        self.RotMat[(6, 2)] = np.array(
+            [[0.9998, -0.0005, 0.0183], [0.0000, 0.9997, 0.0260], [-0.0183, -0.0260, 0.9995]])@self.RotMat[(6, 2)]
+        # self.RotMat[(4, 3)] = Rotation.from_quat([0.689, -0.160, 0.146, 0.692]).as_matrix()
+        self.RotMat[(5, 3)] = np.array([[1.0000, 0.0000, 0.0000], [0.0000, 1.0000, 0.0000], [0.0000, 0.0000, 1.0000]])@ \
+                              self.RotMat[(5, 3)]

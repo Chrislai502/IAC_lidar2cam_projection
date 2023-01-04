@@ -61,11 +61,11 @@
 /* -------------------------------------------------------------------------- */
 /*                             Class Declarations                             */
 /* -------------------------------------------------------------------------- */
-class YOLOv7InferenceNode : public rclcpp::Node
+class Lidar2camNode : public rclcpp::Node
 {
 public:
     // Make an explicit constructor
-    explicit YOLOv7InferenceNode();
+    explicit Lidar2camNode();
 
 private:
 

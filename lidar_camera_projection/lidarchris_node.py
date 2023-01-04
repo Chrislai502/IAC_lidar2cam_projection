@@ -7,7 +7,7 @@ from builtin_interfaces.msg import Duration
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2, PointField, Image
 from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
-from sensor_msgs.msg import CameraInfo
+# from sensor_msgs.msg import CameraInfo
 from sensor_msgs_py import point_cloud2 as pc2
 import numpy as np
 import cv2
@@ -36,15 +36,8 @@ class Lidar2Cam(Node):
         self.time_threshold = 0.01  # 10ms
         # ------------------------------ End Parameters ------------------------------ #
 
-        # Point Clouds
-        # self.front_cloud_msg = None
-        # self.left_cloud_msg  = None
-        # self.right_cloud_msg = None
-
         # Bbox Array (Only the ones with Detections)
         self.bboxes_array_msg = None
-        # self.img_msg = None
-        # self.roi=None
 
         self.cam_map = {
             "vimba_front_left":         1,
@@ -188,20 +181,11 @@ class Lidar2Cam(Node):
         )
         self.image_sub  # prevent unused variable warning
 
-        # # YOLO BBOX Image ---------------------------------- #
-        # self.image_sub = self.create_subscription(
-        #     msg_type    = Image,
-        #     topic       = 'vimba_front_left_center/out/image',
-        #     callback    = self.img_callback,
-        #     qos_profile = self.qos_profile
-        # )
-        # self.image_sub # prevent unused variable warning
 
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
         # ---------------------------------------------------------------------------- #
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
-        # self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
 
     # ---------------------------------------------------------------------------- #
     #                     Callback Functions for Subscriptions                     #
@@ -231,16 +215,6 @@ class Lidar2Cam(Node):
         # print("P")
         self.lidar_msg[3] = msg
 
-    # # ---------------------------------------------------------------------------- #
-    # #         Helper Functions for Projection Calculation and Visualization        #
-    # # ---------------------------------------------------------------------------- #
-    # def img_tocv2(self, message):
-    #     try:
-    #         # Convert the ROS2 Image message to a NumPy array
-    #         image = self.bridge.imgmsg_to_cv2(message, "bgr8")
-    #     except CvBridgeError as e:
-    #         print(e)
-    #     return image
 
     # ---------------------------------------------------------------------------- #
     #                Inverse Lidar camera projection right here                    #
@@ -329,10 +303,6 @@ class Lidar2Cam(Node):
         num_lidar = np.sum(mask)
         print('num lidar in bbox:', num_lidar)
         if num_lidar == 0:
-            # self.image_pub.publish(self.img_msg)
-            # self.image_msg = None
-            # self.point_cloud_msg = None
-            # self.bbox_msg=None
             return
 
         # ---------------------------------------------------------------------------- #
@@ -406,57 +376,7 @@ class Lidar2Cam(Node):
             marker_msg.color.r = 1.0
             marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
             return marker_msg
-            # self.marker_pub.publish(marker_msg)
-            # break
         return None
-
-        # ---------------------------------------------------------------------------- #
-        #                  Reflecting the points on the labelled image                 #
-        # ---------------------------------------------------------------------------- #
-        # if self.img_msg  is not None:
-        #     if max_label>=0:
-        #         image = self.img_tocv2(self.img_msg)
-        #         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
-        #         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
-        #         ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + self.translation_luminar_front2_flc[:,np.newaxis]
-        #         ptc_xyz_camera_filtered = self.camera_info @ ptc_xyz_camera_filtered
-        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
-        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask][np.where(labels==median_xyz_camera[0][2])]
-        #         ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
-        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
-        #
-        #
-        #         border_size=0
-        #         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
-        #
-        #         z_min=np.min(ptc_z_camera)
-        #         z_range=np.max(ptc_z_camera)-z_min
-        #         ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
-        #         ptc_z_camera=ptc_z_camera.astype(np.uint8)
-        #         color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
-        #         r=ptc_xyz_camera_filtered.shape[0]
-        #         for j in range(r):
-        #             i=ptc_xyz_camera_filtered[j]
-        #             c=color[np.newaxis,np.newaxis,j,0]
-        #             a = int(np.floor(i[0]) + border_size)
-        #             b = int(np.floor(i[1]) + border_size)
-        #             if a>0 and b>0:
-        #                 try:
-        #                     image_undistorted[b-1:b+2,a-1:a+2] = c
-        #                 except:
-        #                     continue
-        #
-        #         # Publishing the Image and PointCloud
-        #         self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
-        #     else:
-        #         self.image_pub.publish(self.img_msg)
-
-        # ---------------------------------------------------------------------------- #
-        #    Setting the buffers to None to wait for the next image-pointcloud pair    #
-        # ---------------------------------------------------------------------------- #
-        # self.image_msg = None
-        # self.point_cloud_msg = None
-        # self.bbox_msg=None
 
     def main(args=None):
         rclpy.init(args=args)

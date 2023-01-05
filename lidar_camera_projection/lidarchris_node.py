@@ -260,6 +260,7 @@ class Lidar2Cam(Node):
                 self.lidar_msg[3].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
             do_right = True
 
+        # 1.2 calculate the projection of the bounding boxes and put into a list
         LidarDict = {}
         LidarDict[1] = [[], [], []]
         LidarDict[2] = [[], [], []]
@@ -276,6 +277,7 @@ class Lidar2Cam(Node):
                     LidarDict[lidarId][2].append(self.translation[(camId, lidarId)])
                     count += 1
 
+        # 1.3 filter the points in the pointclouds and transform them into the lidar1 frame
         Lidar1Filtered = self.PointSelection(self.lidar_msg[1], LidarDict[1][0], LidarDict[1][1], LidarDict[1][2])
 
         Lidar2Filtered = self.PointSelection(self.lidar_msg[2], LidarDict[2][0], LidarDict[2][1], LidarDict[2][2])
@@ -285,6 +287,8 @@ class Lidar2Cam(Node):
         Lidar3FilteredIn1 = (self.LidarRotMat[(3, 1)]@Lidar3Filtered.T+self.LidarTranslation[(3, 1)].reshape(3, 1)).T
 
         LidarAllFiltered = np.concatenate((Lidar1Filtered, Lidar2FilteredIn1, Lidar3FilteredIn1), axis=0)
+
+        # 1.4 cluster the points and use oriented bounding box marker fit the points
         stamp = self.bboxes_array_msg.header.stamp
         self.marker_pub.publish(self.Cluster2Marker(LidarAllFiltered, stamp, count))
 

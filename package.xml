@@ -4,13 +4,22 @@
   <name>IAC_lidar2cam_projection</name>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
-  <maintainer email="amansaraf99@gmail.com">roar</maintainer>
+  <maintainer email="">roar</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>vision_msgs</depend>
+  <depend>opencv2</depend>
+  <depend>cv_bridge</depend>
+  <depend>cuda_runtime</depend>
+  <depend>std_msgs</depend>
+  <depend>message_filters</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

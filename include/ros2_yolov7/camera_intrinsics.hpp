@@ -1,4 +1,9 @@
-#include <opencv2/opencv.hpp>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+#include <map>
+#include <string>
+#include <vector>
+#include <memory>
 
 // Struct to hold the intrinsic parameters of a camera
 struct CameraIntrinsics {
@@ -37,6 +42,44 @@ static const CameraIntrinsics vimba_rear_right_intrinsics = {
     (cv::Mat_<double>(1,5) << -0.192458, 0.059495, -0.000126, 0.000092, 0.000000)
 };
 
+
+std::map<std::string, int> CamMap = {
+        {"vimba_front_left", 1},
+        {"vimba_front_left_center", 2},
+        {"vimba_front_right_center", 3},
+        {"vimba_front_right", 4},
+        {"vimba_rear_right", 5},
+        {"vimba_rear_left", 6},
+};
+
+std::map<std::string, int> LidarMap = {
+        {"front", 1},
+        {"left", 2},
+        {"right", 3},
+};
+
+std::map<int, std::vector<int>> cam2lidar = {
+        {1, {1, 2}},
+        {2, {1}},
+        {3, {1}},
+        {4, {1, 3}},
+        {5, {3}},
+        {6, {2}},
+};
+
+struct Transformation {
+    Eigen::Matrix3d Translation;
+    Eigen::Matrix3d Rotation;
+};
+
+std::map<int, std::unique_ptr<sensor_msgs::msg::PointCloud2>> lidar_msg = {
+        {1, nullptr},
+        {2, nullptr},
+        {3, nullptr},
+};
+
+std::map<int,Eigen::Matrix3d> CamMatrix;
+std::map<std::pair<int, int>, transformation> TransformationMap;
   # ---------------------------------------------------------------------------- #
         #         No more Camera Matrix Because the YOLO Node will Deal With it        #
         # ---------------------------------------------------------------------------- #

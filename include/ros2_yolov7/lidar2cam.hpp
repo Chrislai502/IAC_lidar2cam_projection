@@ -42,6 +42,7 @@
 /* ------------------------------ ROS2 Includes ----------------------------- */
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include <sensor_msgs/PointCloud2.h>
 #include "vision_msgs/msg/detection2_d_array.hpp"
 #include <message_filters/pass_through.h>
 #include <message_filters/subscriber.h>
@@ -70,22 +71,18 @@ public:
 private:
 
     /* ------------------ YOLOv7 Private Variable Declarations ------------------ */
-    // YoloV7 TensorRT Engine Path
-    std::string _engine_path;
-    // YoloV7 Detector Object
-    std::unique_ptr<Yolov7> _yolov7;
 
     /* ------------------- Subscriber & Publisher Declarations ------------------ */
     // Image Subscriber
     // TODO: Make this a Synchronized Image Subscriber to get all 6 images at once. 
-    message_filters::Subscriber<sensor_msgs::msg::Image> _front_left_image_sub;
-    message_filters::Subscriber<sensor_msgs::msg::Image> _front_left_center_image_sub;
+    message_filters::Subscriber<sensor_msgs::msg::PointCloud2> _front_left_image_sub;
+    message_filters::Subscriber<sensor_msgs::msg::PointCloud2> _front_left_center_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> _front_right_center_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> _front_right_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> _rear_right_image_sub;
     message_filters::Subscriber<sensor_msgs::msg::Image> _rear_left_image_sub;
-
-    using SyncPolicy = message_filters::sync_policies::LatestTime<sensor_msgs::msg::Image,
+    Subscriber<sensor_msgs::msg::PointCloud2> _front_right_center_image_sub;
+    rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr _yolo_subscriber;    using SyncPolicy = message_filters::sync_policies::LatestTime<sensor_msgs::msg::Image,
         sensor_msgs::msg::Image,
         sensor_msgs::msg::Image,
         sensor_msgs::msg::Image,

@@ -29,12 +29,6 @@ Lidar2camNode::Lidar2camNode() : rclcpp::Node("Lidar2camNode")
 
     // Initialize member variables
     time_threshold_ = std::chrono::duration<double, std::milli>(10);
-    bboxes_array_msg_ = nullptr;
-    
-    // Declare a pointer to bgr msgs in CV2 format
-    _bgr_imgs = std::make_shared<std::vector<cv::Mat>>();
-    // TODO: Relook at how many images you want to store here when generalizing to multiple cameras.
-    _bgr_imgs->reserve(6);
 
 
     /* ------------------------------- QOS Profile ------------------------------ */
@@ -43,12 +37,10 @@ Lidar2camNode::Lidar2camNode() : rclcpp::Node("Lidar2camNode")
 
     // TODO: Make the camera topic variable and do synchronous subscription over 6 topics.
     /* --------------------------- Image Subscription --------------------------- */
-    _front_left_image_sub.subscribe(this, "vimba_front_left/image", qos_profile);
-    _front_left_center_image_sub.subscribe(this, "vimba_front_left_center/image", qos_profile);
-    _front_right_center_image_sub.subscribe(this, "vimba_front_right_center/image", qos_profile);
-    _front_right_image_sub.subscribe(this, "vimba_front_right/image", qos_profile);
-    _rear_right_image_sub.subscribe(this, "vimba_rear_right/image", qos_profile);
-    _rear_left_image_sub.subscribe(this, "vimba_rear_left/image", qos_profile);
+    _luminar_front.subscribe(this, "luminar_front/points", qos_profile);
+    _luminar_left.subscribe(this, "luminar_left/points", qos_profile);
+    _luminar_right.subscribe(this, "luminar_right/points", qos_profile);
+    _yolo_subscriber = this->create_subscription<vision_msgs::msg::Detection2DArray>("/vimba_front_left_center/det3d", qos_profile);
 
     /* -------------------- Filter size for exact time queue -------------------- */
     // TODO: Consider making this a rosparam
@@ -70,12 +62,12 @@ Lidar2camNode::Lidar2camNode() : rclcpp::Node("Lidar2camNode")
                                         _rear_left_image_sub);
 
     _sync_ptr->registerCallback(std::bind(
-    &YOLOv7InferenceNode::sync_callback, this, _1, _2, _3, _4, _5, _6));
+    &Lidar2camNode::sync_callback, this, _1, _2, _3, _4, _5, _6));
 
     /* ----------------------------- Image Publisher ---------------------------- */
     // TODO: DEBUG ONLY. REMOVE FROM PRODUCTION CODE.
     _camera_img_with_det_pub = this->create_publisher<sensor_msgs::msg::Image>(
-        "/vimba_front_left_center/det_image",
+        "/lidar/projection_image",
         sensor_msgs_qos
     );
 
@@ -86,13 +78,10 @@ Lidar2camNode::Lidar2camNode() : rclcpp::Node("Lidar2camNode")
     );
 }
 
-void YOLOv7InferenceNode::sync_callback(
-    const sensor_msgs::msg::Image::ConstSharedPtr & front_left,
-    const sensor_msgs::msg::Image::ConstSharedPtr & front_left_center,
-    const sensor_msgs::msg::Image::ConstSharedPtr & front_right_center,
-    const sensor_msgs::msg::Image::ConstSharedPtr & front_right,
-    const sensor_msgs::msg::Image::ConstSharedPtr & rear_right,
-    const sensor_msgs::msg::Image::ConstSharedPtr & rear_left
+void Lidar2camNode::sync_callback(
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr & _luminar_front,
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr & _luminar_left,
+    const sensor_msgs::msg::PointCloud2::ConstSharedPtr & _luminar_right,
 )
 {
     auto current_time = this->now();
@@ -220,7 +209,7 @@ void YOLOv7InferenceNode::sync_callback(
 //     return max_stamp;
 // }
 
-cv_bridge::CvImagePtr YOLOv7InferenceNode::cv_bridge_convert(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
+cv_bridge::CvImagePtr Lidar2camNode::cv_bridge_convert(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
 {
     /* ------------------ Receive msg and convert to cv2 format ----------------- */
     try

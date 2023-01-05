@@ -142,10 +142,10 @@ class Lidar2Cam(Node):
         r2inv = np.linalg.inv(self.RotMat[(1, 1)])
         self.LidarTranslation[(2, 1)] = r2inv@self.translation[(1, 2)]-self.translation[(1, 1)]
         self.LidarRotMat[(2, 1)] = r2inv@self.RotMat[(1, 2)]
-        # 4,1 and 4,3
-        r2inv = np.linalg.inv(self.RotMat[(4, 3)])
-        self.LidarTranslation[(1, 3)] = r2inv@self.translation[(4, 1)]-self.translation[(4, 3)]
-        self.LidarRotMat[(1, 3)] = r2inv@self.RotMat[(4, 1)]
+        # 4,3 and 4,1
+        r2inv = np.linalg.inv(self.RotMat[(4, 1)])
+        self.LidarTranslation[(3, 1)] = r2inv@self.translation[(4, 3)]-self.translation[(4, 1)]
+        self.LidarRotMat[(3, 1)] = r2inv@self.RotMat[(4, 3)]
 
         # ---------------------------------------------------------------------------- #
         #                                  QOS Profile                                 #
@@ -194,7 +194,6 @@ class Lidar2Cam(Node):
             qos_profile=self.qos_profile
         )
         self.image_sub  # prevent unused variable warning
-
 
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
@@ -266,7 +265,6 @@ class Lidar2Cam(Node):
         LidarDict[2] = [[], [], []]
         LidarDict[3] = [[], [], []]
         count = 0
-        stamp = None
         for bbox_msg in self.bboxes_array_msg.detections:
             camId = bbox_msg.frame_id
             lidarIdList = self.cam2lidar[camId]
@@ -277,19 +275,17 @@ class Lidar2Cam(Node):
                     LidarDict[lidarId][1].append(self.RotMat[(camId, lidarId)])
                     LidarDict[lidarId][2].append(self.translation[(camId, lidarId)])
                     count += 1
-                    stamp = self.lidar_msg[lidarId].header.stamp
-                    # marker = self.bbox2lidar(self.lidar_msg[lidarId], bbox_msg, self.cam_matrix[camId],
-                    #                          self.RotMat[(camId, lidarId)], self.translation[(camId, lidarId)])
-                    # if marker is not None:
-                    #     markerList.append(marker)
+
+        Lidar1Filtered = self.PointSelection(self.lidar_msg[1], LidarDict[1][0], LidarDict[1][1], LidarDict[1][2])
 
         Lidar2Filtered = self.PointSelection(self.lidar_msg[2], LidarDict[2][0], LidarDict[2][1], LidarDict[2][2])
         Lidar2FilteredIn1 = (self.LidarRotMat[(2, 1)]@Lidar2Filtered.T+self.LidarTranslation[(2, 1)].reshape(3, 1)).T
-        Lidar1Filtered = self.PointSelection(self.lidar_msg[1], LidarDict[1][0], LidarDict[1][1], LidarDict[1][2])
-        Lidar1Filtered = np.concatenate((Lidar1Filtered, Lidar2FilteredIn1), axis=0)
-        Lidar1FilteredIn3 = (self.LidarRotMat[(1, 3)]@Lidar1Filtered.T+self.LidarTranslation[(1, 3)].reshape(3, 1)).T
+
         Lidar3Filtered = self.PointSelection(self.lidar_msg[3], LidarDict[3][0], LidarDict[3][1], LidarDict[3][2])
-        LidarAllFiltered = np.concatenate((Lidar3Filtered, Lidar1FilteredIn3), axis=0)
+        Lidar3FilteredIn1 = (self.LidarRotMat[(3, 1)]@Lidar3Filtered.T+self.LidarTranslation[(3, 1)].reshape(3, 1)).T
+
+        LidarAllFiltered = np.concatenate((Lidar1Filtered, Lidar2FilteredIn1, Lidar3FilteredIn1), axis=0)
+        stamp = self.bboxes_array_msg.header.stamp
         self.marker_pub.publish(self.Cluster2Marker(LidarAllFiltered, stamp, count))
 
     def BboxInLidarDirection(self, bbox_msg, camera_info, RotMat):
@@ -372,8 +368,12 @@ class Lidar2Cam(Node):
         # # ---------------------------------------------------------------------------- #
         # #                   Creating a Marker Object to be published                   #
         # # ---------------------------------------------------------------------------- #
-
+        markerList = []
+        count = 0
         for cluster_bbox, _, _ in median_xyz_camera:
+            count += 1
+            if count > BboxCount:
+                break
             if bbox_rotate_mode:
                 center = cluster_bbox.get_center()
                 extent = cluster_bbox.extent
@@ -407,8 +407,8 @@ class Lidar2Cam(Node):
             marker_msg.color.a = 0.5
             marker_msg.color.r = 1.0
             marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
-            return marker_msg
-        return None
+            markerList.append(marker_msg)
+        return markerList
 
     def main(args=None):
         rclpy.init(args=args)

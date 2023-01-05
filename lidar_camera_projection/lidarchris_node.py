@@ -7,7 +7,7 @@ from builtin_interfaces.msg import Duration
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import PointCloud2, PointField, Image
 from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
-from sensor_msgs.msg import CameraInfo
+# from sensor_msgs.msg import CameraInfo
 from sensor_msgs_py import point_cloud2 as pc2
 import numpy as np
 import cv2
@@ -36,15 +36,8 @@ class Lidar2Cam(Node):
         self.time_threshold = 0.01  # 10ms
         # ------------------------------ End Parameters ------------------------------ #
 
-        # Point Clouds
-        # self.front_cloud_msg = None
-        # self.left_cloud_msg  = None
-        # self.right_cloud_msg = None
-
         # Bbox Array (Only the ones with Detections)
         self.bboxes_array_msg = None
-        # self.img_msg = None
-        # self.roi=None
 
         self.cam_map = {
             "vimba_front_left":         1,
@@ -202,20 +195,11 @@ class Lidar2Cam(Node):
         )
         self.image_sub  # prevent unused variable warning
 
-        # # YOLO BBOX Image ---------------------------------- #
-        # self.image_sub = self.create_subscription(
-        #     msg_type    = Image,
-        #     topic       = 'vimba_front_left_center/out/image',
-        #     callback    = self.img_callback,
-        #     qos_profile = self.qos_profile
-        # )
-        # self.image_sub # prevent unused variable warning
 
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
         # ---------------------------------------------------------------------------- #
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
-        # self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
 
     # ---------------------------------------------------------------------------- #
     #                     Callback Functions for Subscriptions                     #

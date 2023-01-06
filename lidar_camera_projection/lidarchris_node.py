@@ -2,20 +2,20 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
-from vision_msgs.msg import Detection3D, BoundingBox3D, BoundingBox2D #, BoundingBox2DArray
+from vision_msgs.msg import BoundingBox2D #, BoundingBox2DArray
 from builtin_interfaces.msg import Duration
 from visualization_msgs.msg import Marker
-from sensor_msgs.msg import PointCloud2, PointField, Image
-from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
-from sensor_msgs.msg import CameraInfo
-from sensor_msgs_py import point_cloud2 as pc2
+from sensor_msgs.msg import PointCloud2, Image
+# from message_filters import ApproximateTimeSynchronizer, TimeSynchronizer, Subscriber
+# from sensor_msgs.msg import CameraInfo
+# from sensor_msgs_py import point_cloud2 as pc2
 import numpy as np
-import cv2
+# import cv2
 from cv_bridge import CvBridge, CvBridgeError
 from ros2_numpy.point_cloud2 import array_to_pointcloud2, pointcloud2_to_array, get_xyz_points
 import os
-import time
-import math
+# import time
+# import math
 from numpy.linalg import inv
 import open3d as o3d
 from .utils_lidar import boxes_to_matirx
@@ -35,12 +35,12 @@ class Lidar2Cam(Node):
         # ---------------------------------------------------------------------------- #
         #         All the Hard Coded Matrices Applies to Front Left Camera ONLY        #
         # ---------------------------------------------------------------------------- #
-        self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
-                                     [0.000000, 1731.274561, 295.484988], 
-                                     [0.000000, 0.000000, 1.000000*2]])*0.5
         # self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
         #                              [0.000000, 1731.274561, 295.484988], 
-        #                              [0.000000, 0.000000, 1.000000]])
+        #                              [0.000000, 0.000000, 1.000000*2]])*0.5
+        self.camera_info = np.array([[1732.571708, 0.000000, 549.797164], 
+                                     [0.000000, 1731.274561, 295.484988], 
+                                     [0.000000, 0.000000, 1.000000]])
         print(self.camera_info)
 
         # ---------------------------------------------------------------------------- #
@@ -284,49 +284,49 @@ class Lidar2Cam(Node):
         # ---------------------------------------------------------------------------- #
         #                  Reflecting the points on the labelled image                 #
         # ---------------------------------------------------------------------------- #
-        if self.img_msg  is not None:
-            if max_label>=0:
-                image = self.img_tocv2(self.img_msg) 
-                # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
-                ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
-                ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
-                ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + self.translation_luminar_front2_flc[:,np.newaxis]
-                ptc_xyz_camera_filtered = self.camera_info @ ptc_xyz_camera_filtered
-                ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
-                ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask][np.where(labels==median_xyz_camera[0][2])]
-                ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
-                ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
+        # if self.img_msg  is not None:
+        #     if max_label>=0:
+        #         image = self.img_tocv2(self.img_msg) 
+        #         # translation_stacked = np.tile(self.translation_luminar_front2_flc.reshape((-1, 1)), ptc_xyz_lidar.shape[0])
+        #         ptc_numpy_record = pointcloud2_to_array(self.point_cloud_msg)
+        #         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record) # (N * 3 matrix)
+        #         ptc_xyz_camera_filtered = self.RotMat_luminar_front2_flc @ ptc_xyz_lidar.T + self.translation_luminar_front2_flc[:,np.newaxis]
+        #         ptc_xyz_camera_filtered = self.camera_info @ ptc_xyz_camera_filtered
+        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
+        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered[mask][np.where(labels==median_xyz_camera[0][2])]
+        #         ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
+        #         ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
                 
                 
-                border_size=0
-                image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
+        #         border_size=0
+        #         image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
 
-                z_min=np.min(ptc_z_camera)
-                z_range=np.max(ptc_z_camera)-z_min
-                # print(z_min,z_range)
-                ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
-                ptc_z_camera=ptc_z_camera.astype(np.uint8)
-                color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
-                r=ptc_xyz_camera_filtered.shape[0]
-                for j in range(r):
-                    i=ptc_xyz_camera_filtered[j]
-                    c=color[np.newaxis,np.newaxis,j,0]
-                    a = int(np.floor(i[0]) + border_size)
-                    b = int(np.floor(i[1]) + border_size)
-                    if a>0 and b>0:
-                        try:
-                            image_undistorted[b-1:b+2,a-1:a+2] = c
-                        except:
-                            continue
+        #         z_min=np.min(ptc_z_camera)
+        #         z_range=np.max(ptc_z_camera)-z_min
+        #         # print(z_min,z_range)
+        #         ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
+        #         ptc_z_camera=ptc_z_camera.astype(np.uint8)
+        #         color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
+        #         r=ptc_xyz_camera_filtered.shape[0]
+        #         for j in range(r):
+        #             i=ptc_xyz_camera_filtered[j]
+        #             c=color[np.newaxis,np.newaxis,j,0]
+        #             a = int(np.floor(i[0]) + border_size)
+        #             b = int(np.floor(i[1]) + border_size)
+        #             if a>0 and b>0:
+        #                 try:
+        #                     image_undistorted[b-1:b+2,a-1:a+2] = c
+        #                 except:
+        #                     continue
 
-                # for i in ptc_xyz_camera[mask]:
-                #     image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
-                #     # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
+        #         # for i in ptc_xyz_camera[mask]:
+        #         #     image_undistorted = cv2.circle(image_undistorted, (int(i[0]+border_size), int(i[1])+border_size), 1, (0, 0, 255), 2)
+        #         #     # image_undistorted = cv2.circle(image_undistorted, (int(i[0]), int(i[1])), 1, (0, 0, 255), 1)
 
-                # Publishing the Image and PointCloud
-                self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
-            else:
-                self.image_pub.publish(self.img_msg)
+        #         # Publishing the Image and PointCloud
+        #         self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
+        #     else:
+        #         self.image_pub.publish(self.img_msg)
 
         # ---------------------------------------------------------------------------- #
         #    Setting the buffers to None to wait for the next image-pointcloud pair    #

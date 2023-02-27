@@ -71,18 +71,18 @@ def box_to_corners(cx, cy, width, height):
 
     return (y1, y2, x1, x2) #(up, down, left, right)
 
-# Helper function that convert list of boxes to a matrix
+
+'''
+Helper function that convert list of boxes to a matrix
+returns:
+    mat_return: stacked (3, N*2) matrix of N boxes, each box is a 3x2 matrix
+'''
 def boxes_to_matirx(boxes,offset=0): 
-    '''
-    Helper function that convert list of boxes to a matrix
-    '''
     mat_return = []
     for box_msg in boxes:
-        # print("Infunc: ", box_msg)
         top, bot, left, right = box_to_corners(box_msg.bbox.center.x, box_msg.bbox.center.y, box_msg.bbox.size_x, box_msg.bbox.size_y)
         mat = np.array([[right+offset, left-offset], 
                         [bot+offset,  top-offset], 
                         [1 , 1]]) # (2x3 camera corner matrix)
-        # print("Infunc: ", mat)
         mat_return.append(mat)
     return np.stack(mat_return,axis=0)

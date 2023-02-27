@@ -235,7 +235,7 @@ class Lidar2Cam(Node):
 
     # ------------------------------ YOLO Detection ------------------------------ #
     def YOLO_callback(self, msg):
-        print("B")
+        # print("B")
         self.bboxes_array_msg = msg
 
         self.execute_projection()
@@ -277,6 +277,7 @@ class Lidar2Cam(Node):
         #     return
         # 1.1
         # Timestamp check
+        #TODO : Check if the timestamp is within a threshold
         do_left, do_right, do_front = [self.lidar_msg[i] is not None for i in [1,2,3]]
         # if self.lidar_msg[1] is not None and abs(
         #         self.lidar_msg[1].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
@@ -289,16 +290,21 @@ class Lidar2Cam(Node):
         #     do_right = True
 
         # 1.2 calculate the projection of the bounding boxes and put into a list
+        '''
+        the structure of the LidarDict is as follows:
+        LidarDict = {[[], [cam1, cam2, ...]]}
+        '''
         LidarDict = {}
         LidarDict[1] = [[], []]
         LidarDict[2] = [[], []]
         LidarDict[3] = [[], []]
         count = 0
+
+        # Picking which lidars we will be performing the projection on
         for bbox_msg in self.bboxes_array_msg.detections:
             camId = self.cam_map[bbox_msg.header.frame_id]
             lidarIdList = self.cam2lidar[camId]
-            print(bbox_msg.header.frame_id,time.time())
-            # print(lidarIdList)
+            # print(f"camId: {camId}, lidarIdList: {lidarIdList}")
             for lidarId in lidarIdList:
                 if (lidarId == 1 and do_front) or (lidarId == 2 and do_left) or (lidarId == 3 and do_right):
                     LidarDict[lidarId][0].append(self.BboxInLidarDirection(bbox_msg, camId,lidarId))
@@ -306,33 +312,44 @@ class Lidar2Cam(Node):
             count += 1
         if count==0:
             return
-        print(count)
+        # print(count)
         # 1.3 filter the points in the pointclouds and transform them into the lidar1 frame
         Lidar1Filtered = self.PointSelection(1, LidarDict[1][0], LidarDict[1][1])
-        print(Lidar1Filtered.shape,np.average(Lidar1Filtered,axis=0))
+        # print(Lidar1Filtered.shape,np.average(Lidar1Filtered,axis=0))
 
         Lidar2Filtered = self.PointSelection(2, LidarDict[2][0], LidarDict[2][1])
         Lidar2FilteredIn1 = (self.LidarRotMat[(2, 1)]@Lidar2Filtered.T+self.LidarTranslation[(2, 1)].reshape(3, 1)).T
-        print(Lidar2FilteredIn1.shape,np.average(Lidar2FilteredIn1,axis=0))
+        # print(Lidar2FilteredIn1.shape,np.average(Lidar2FilteredIn1,axis=0))
 
         Lidar3Filtered = self.PointSelection(3, LidarDict[3][0], LidarDict[3][1])
         Lidar3FilteredIn1 = (self.LidarRotMat[(3, 1)]@Lidar3Filtered.T+self.LidarTranslation[(3, 1)].reshape(3, 1)).T
-        print(Lidar3FilteredIn1.shape,np.average(Lidar3FilteredIn1,axis=0))
+        # print(Lidar3FilteredIn1.shape,np.average(Lidar3FilteredIn1,axis=0))
         LidarAllFiltered = np.concatenate((Lidar1Filtered, Lidar2FilteredIn1, Lidar3FilteredIn1), axis=0)
         # LidarAllFiltered=Lidar1Filtered
         # 1.4 cluster the points and use oriented bounding box marker fit the points
-        print(LidarAllFiltered.shape)
+        # print(LidarAllFiltered.shape)
         if LidarAllFiltered.shape[0]>10:
             stamp = self.bboxes_array_msg.header.stamp
             self.Cluster2Marker(LidarAllFiltered, stamp, count)
 
+
+    '''
+    T
+    '''
     def BboxInLidarDirection(self, bbox_msg, camId,lidarId):
+        
+        # Take the inverse of the camera matrix
         K_inv = inv(self.cam_matrix[camId])
-        # print(boxes_to_matirx([bbox_msg], 0))
+
+        # Transform the bounding boxes
         camera_corners_cam = K_inv@boxes_to_matirx([bbox_msg], 0)
-        R_inv = inv(self.RotMat[(camId,lidarId)])
+
         # Apply the inverse rotation matrix
+        print (f"before: {camera_corners_cam}\n")
+        R_inv = inv(self.RotMat[(camId,lidarId)])
         camera_corners_lid = R_inv@camera_corners_cam  # This operation will make the bottom row not necessarily zero
+        print (f"shape: {camera_corners_lid}\n")
+
         # The First is the Z-axis of the lidar frame
         camera_corners_lid_z = camera_corners_lid[:, 0:1]
         camera_corners_lid_normed = camera_corners_lid[:, 1:]/camera_corners_lid_z
@@ -384,7 +401,7 @@ class Lidar2Cam(Node):
             )
         )
         max_label = labels.max()
-        print('label num:', max_label+1)
+        # print('label num:', max_label+1)
         self.point2img(ptc_xyz_camera_list[labels!=-1],4,1)
         # ---------------------------------------------------------------------------- #
         #                                Calculate 3D BBox                             #
@@ -392,7 +409,7 @@ class Lidar2Cam(Node):
         median_xyz_camera = []
         bbox_rotate_mode = True
         for i in range(max_label+1):
-            print(f'label {i} num:', np.where(labels == i)[0].shape)
+            # print(f'label {i} num:', np.where(labels == i)[0].shape)
             cluster = o3d_pcd.select_by_index(list(np.where(labels == i)[0]))
             if bbox_rotate_mode:
                 cluster_bbox = cluster.get_oriented_bounding_box()
@@ -400,8 +417,8 @@ class Lidar2Cam(Node):
                 cluster_bbox = cluster.get_axis_aligned_bounding_box()
             median_xyz_camera.append([cluster_bbox, abs(cluster_bbox.get_center()[0]), i])
         median_xyz_camera.sort(key=lambda x: x[1])
-        if max_label > -1:
-            print('label choosed:', median_xyz_camera[0][2], 'distance:', median_xyz_camera[0][1])
+        # if max_label > -1:
+            # print('label choosed:', median_xyz_camera[0][2], 'distance:', median_xyz_camera[0][1])
 
         # # ---------------------------------------------------------------------------- #
         # #                   Creating a Marker Object to be published                   #
@@ -423,7 +440,7 @@ class Lidar2Cam(Node):
                 center = cluster_bbox.get_center()
                 extent = cluster_bbox.get_extent()
                 center = [center[0], -center[1], center[2]]
-            print(center)
+            # print(center)
             marker_msg = Marker()
             marker_msg.header.frame_id = "luminar_front"
             marker_msg.header.stamp = stamp
@@ -454,7 +471,7 @@ class Lidar2Cam(Node):
         if self.img  is not None:
             if ptc_xyz_lidar.shape[0]>0:
                 image = self.img_tocv2(self.img)
-                print(image.shape)
+                # print(image.shape)
                 ptc_xyz_camera_filtered = self.RotMat[(camid,lidarid)] @ ptc_xyz_lidar.T + self.translation[(camid,lidarid)][:,np.newaxis]
                 ptc_xyz_camera_filtered = self.cam_matrix[camid] @ ptc_xyz_camera_filtered
                 ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T

@@ -20,6 +20,7 @@ from numpy.linalg import inv
 import open3d as o3d
 from .utils_lidar import boxes_to_matirx
 from scipy.spatial.transform import Rotation
+import time
 
 print(os.getcwd())
 
@@ -38,7 +39,7 @@ class Lidar2Cam(Node):
 
         # Bbox Array (Only the ones with Detections)
         self.bboxes_array_msg = None
-
+        self.img=None
         self.cam_map = {
             "vimba_front_left":         1,
             "vimba_front_left_center":  2,
@@ -88,7 +89,9 @@ class Lidar2Cam(Node):
             [[189.189981, -14.738140, 257.995696], [0.000000, 191.503315, 174.894545], [0.000000, 0.000000, 1.000000]])
         self.cam_matrix[6] = np.array(
             [[172.786842, 1.411124, 255.612286], [0.000000, 170.205329, 195.844222], [0.000000, 0.000000, 1.000000]])
-
+        for i in [2,3]:
+            self.cam_matrix[i]/=2
+            self.cam_matrix[i][2,2]=1
         # ---------------------------------------------------------------------------- #
         #                        Original Transformation Matrices                      #
         # ---------------------------------------------------------------------------- #
@@ -120,20 +123,26 @@ class Lidar2Cam(Node):
         self.translation[(6, 2)] += np.array([0.0000, 0.0000, 0.1430])  # Left Lidar to Rear Left Camera
         # self.translation[(4, 3)] = np.array([0.575, -0.121, -0.286])  # Right Lidar to Front Right Camera
         self.translation[(5, 3)] += np.array([0.0270, -0.0340, 0.0000])  # Right Lidar to Rear Right Camera
-        self.RotMat[(2, 1)] = np.array(
-            [[0.9998, -0.0018, 0.0176], [0.0018, 0.9992, 0.0400], [-0.0176, -0.0400, 0.9990]])@self.RotMat[(2, 1)]
-        self.RotMat[(3, 1)] = np.array(
-            [[0.9951, -0.0024, -0.0986], [0.0000, 0.9997, -0.0244], [0.0986, 0.0243, 0.9948]])@self.RotMat[(3, 1)]
-        self.RotMat[(1, 1)] = np.array(
-            [[0.9998, 0.0059, 0.0203], [-0.0059, 1.0000, 0.0015], [-0.0202, -0.0016, 0.9998]])@self.RotMat[(1, 1)]
-        self.RotMat[(4, 1)] = np.array(
-            [[0.9988, -0.0422, 0.0239], [0.0427, 0.9988, -0.0238], [-0.0229, 0.0248, 0.9994]])@self.RotMat[(4, 1)]
+        tmp=np.array([[0.9998, -0.0018, 0.0176], [0.0018, 0.9992, 0.0400], [-0.0176, -0.0400, 0.9990]])
+        self.translation[(2, 1)]=tmp@self.translation[(2, 1)]
+        self.RotMat[(2, 1)] = tmp@self.RotMat[(2, 1)]
+        tmp=np.array([[0.9951, -0.0024, -0.0986], [0.0000, 0.9997, -0.0244], [0.0986, 0.0243, 0.9948]])
+        self.translation[(3, 1)]=tmp@self.translation[(3, 1)]
+        self.RotMat[(3, 1)] = tmp@self.RotMat[(3, 1)]
+        tmp=np.array([[0.9998, 0.0059, 0.0203], [-0.0059, 1.0000, 0.0015], [-0.0202, -0.0016, 0.9998]])
+        self.translation[(1, 1)]=tmp@self.translation[(1, 1)]
+        self.RotMat[(1, 1)] = tmp@self.RotMat[(1, 1)]
+        tmp=np.array([[0.9988, -0.0422, 0.0239], [0.0427, 0.9988, -0.0238], [-0.0229, 0.0248, 0.9994]])
+        self.translation[(4, 1)]=tmp@self.translation[(4, 1)]
+        self.RotMat[(4, 1)] = tmp@self.RotMat[(4, 1)]
         # self.RotMat[(1, 2)] = Rotation.from_quat([-0.153, 0.690, -0.690, -0.153]).as_matrix()
-        self.RotMat[(6, 2)] = np.array(
-            [[0.9998, -0.0005, 0.0183], [0.0000, 0.9997, 0.0260], [-0.0183, -0.0260, 0.9995]])@self.RotMat[(6, 2)]
+        tmp=np.array([[0.9998, -0.0005, 0.0183], [0.0000, 0.9997, 0.0260], [-0.0183, -0.0260, 0.9995]])
+        self.translation[(6, 2)]=tmp@self.translation[(6, 2)]
+        self.RotMat[(6, 2)] = tmp@self.RotMat[(6, 2)]
         # self.RotMat[(4, 3)] = Rotation.from_quat([0.689, -0.160, 0.146, 0.692]).as_matrix()
-        self.RotMat[(5, 3)] = np.array([[1.0000, 0.0000, 0.0000], [0.0000, 1.0000, 0.0000], [0.0000, 0.0000, 1.0000]])@ \
-                              self.RotMat[(5, 3)]
+        tmp=np.array([[1.0000, 0.0000, 0.0000], [0.0000, 1.0000, 0.0000], [0.0000, 0.0000, 1.0000]])
+        self.translation[(5, 3)]=tmp@self.translation[(5, 3)]
+        self.RotMat[(5, 3)] = tmp@self.RotMat[(5, 3)]
 
         # ---------------------------------------------------------------------------- #
         #                    Calculate Lidar Transformation Matrices                   #
@@ -190,15 +199,30 @@ class Lidar2Cam(Node):
         # YOLO Detection2DArray Subscription ---------------------------------- #
         self.image_sub = self.create_subscription(
             msg_type=Detection2DArray,
-            topic='vimba_front_left_center/out/objects',
+            topic='/vimba/det3d',
+            callback = self.YOLO_callback,
             qos_profile=self.qos_profile
         )
         self.image_sub  # prevent unused variable warning
+
+        # YOLO BBOX Image ---------------------------------- #
+        self.imagebbox_sub = self.create_subscription(
+            msg_type    = Image,
+            topic       = 'vimba_fr/det_image',
+            callback    = self.img_callback,
+            qos_profile = self.qos_profile
+        )
+        self.imagebbox_sub # prevent unused variable warning
+
 
         # ---------------------------------------------------------------------------- #
         #                                  Publishers                                  #
         # ---------------------------------------------------------------------------- #
         self.marker_pub = self.create_publisher(Marker, '/Lidar_car_marker', rclpy.qos.qos_profile_sensor_data)
+        self.image_pub = self.create_publisher(Image , "/Lidar_filtered_label", rclpy.qos.qos_profile_sensor_data)
+
+
+
 
     # ---------------------------------------------------------------------------- #
     #                     Callback Functions for Subscriptions                     #
@@ -211,33 +235,37 @@ class Lidar2Cam(Node):
 
     # ------------------------------ YOLO Detection ------------------------------ #
     def YOLO_callback(self, msg):
-        # print("B")
+        print("B")
         self.bboxes_array_msg = msg
+
         self.execute_projection()
+
+    def img_callback(self,msg):
+        self.img=msg
 
     # -------------------------------- PointClouds ------------------------------- #
     def front_cloud_callback(self, msg):
-        # print("P")
+        # print("PF")
         self.lidar_msg[1] = msg
 
     def left_cloud_callback(self, msg):
-        # print("P")
+        # print("PL")
         self.lidar_msg[2] = msg
 
     def right_cloud_callback(self, msg):
-        # print("P")
+        # print("PR")
         self.lidar_msg[3] = msg
 
     # # ---------------------------------------------------------------------------- #
     # #         Helper Functions for Projection Calculation and Visualization        #
     # # ---------------------------------------------------------------------------- #
-    # def img_tocv2(self, message):
-    #     try:
-    #         # Convert the ROS2 Image message to a NumPy array
-    #         image = self.bridge.imgmsg_to_cv2(message, "bgr8")
-    #     except CvBridgeError as e:
-    #         print(e)
-    #     return image
+    def img_tocv2(self, message):
+        try:
+            # Convert the ROS2 Image message to a NumPy array
+            image = self.bridge.imgmsg_to_cv2(message, "bgr8")
+        except CvBridgeError as e:
+            print(e)
+        return image
 
     # ---------------------------------------------------------------------------- #
     #                Inverse Lidar camera projection right here                    #
@@ -249,53 +277,60 @@ class Lidar2Cam(Node):
         #     return
         # 1.1
         # Timestamp check
-        do_left, do_right, do_front = False, False, False
-        if self.front_cloud_msg is not None and abs(
-                self.lidar_msg[1].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
-            do_front = True
-        if self.left_cloud_msg is not None and abs(
-                self.lidar_msg[2].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
-            do_left = True
-        if self.right_cloud_msg is not None and abs(
-                self.lidar_msg[3].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
-            do_right = True
+        do_left, do_right, do_front = [self.lidar_msg[i] is not None for i in [1,2,3]]
+        # if self.lidar_msg[1] is not None and abs(
+        #         self.lidar_msg[1].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
+        #     do_front = True
+        # if self.lidar_msg[2] is not None and abs(
+        #         self.lidar_msg[2].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
+        #     do_left = True
+        # if self.lidar_msg[3] is not None and abs(
+        #         self.lidar_msg[3].header.stamp-self.bboxes_array_msg.header.stamp) <= self.time_threshold:
+        #     do_right = True
 
         # 1.2 calculate the projection of the bounding boxes and put into a list
         LidarDict = {}
-        LidarDict[1] = [[], [], []]
-        LidarDict[2] = [[], [], []]
-        LidarDict[3] = [[], [], []]
+        LidarDict[1] = [[], []]
+        LidarDict[2] = [[], []]
+        LidarDict[3] = [[], []]
         count = 0
         for bbox_msg in self.bboxes_array_msg.detections:
-            camId = bbox_msg.frame_id
+            camId = self.cam_map[bbox_msg.header.frame_id]
             lidarIdList = self.cam2lidar[camId]
+            print(bbox_msg.header.frame_id,time.time())
+            # print(lidarIdList)
             for lidarId in lidarIdList:
                 if (lidarId == 1 and do_front) or (lidarId == 2 and do_left) or (lidarId == 3 and do_right):
-                    LidarDict[lidarId][0].append(
-                        self.BboxInLidarDirection(bbox_msg, self.cam_matrix[camId], self.RotMat[(camId, lidarId)]))
-                    LidarDict[lidarId][1].append(self.RotMat[(camId, lidarId)])
-                    LidarDict[lidarId][2].append(self.translation[(camId, lidarId)])
-                    count += 1
-
+                    LidarDict[lidarId][0].append(self.BboxInLidarDirection(bbox_msg, camId,lidarId))
+                    LidarDict[lidarId][1].append(camId)
+            count += 1
+        if count==0:
+            return
+        print(count)
         # 1.3 filter the points in the pointclouds and transform them into the lidar1 frame
-        Lidar1Filtered = self.PointSelection(self.lidar_msg[1], LidarDict[1][0], LidarDict[1][1], LidarDict[1][2])
+        Lidar1Filtered = self.PointSelection(1, LidarDict[1][0], LidarDict[1][1])
+        print(Lidar1Filtered.shape,np.average(Lidar1Filtered,axis=0))
 
-        Lidar2Filtered = self.PointSelection(self.lidar_msg[2], LidarDict[2][0], LidarDict[2][1], LidarDict[2][2])
+        Lidar2Filtered = self.PointSelection(2, LidarDict[2][0], LidarDict[2][1])
         Lidar2FilteredIn1 = (self.LidarRotMat[(2, 1)]@Lidar2Filtered.T+self.LidarTranslation[(2, 1)].reshape(3, 1)).T
+        print(Lidar2FilteredIn1.shape,np.average(Lidar2FilteredIn1,axis=0))
 
-        Lidar3Filtered = self.PointSelection(self.lidar_msg[3], LidarDict[3][0], LidarDict[3][1], LidarDict[3][2])
+        Lidar3Filtered = self.PointSelection(3, LidarDict[3][0], LidarDict[3][1])
         Lidar3FilteredIn1 = (self.LidarRotMat[(3, 1)]@Lidar3Filtered.T+self.LidarTranslation[(3, 1)].reshape(3, 1)).T
-
+        print(Lidar3FilteredIn1.shape,np.average(Lidar3FilteredIn1,axis=0))
         LidarAllFiltered = np.concatenate((Lidar1Filtered, Lidar2FilteredIn1, Lidar3FilteredIn1), axis=0)
-
+        # LidarAllFiltered=Lidar1Filtered
         # 1.4 cluster the points and use oriented bounding box marker fit the points
-        stamp = self.bboxes_array_msg.header.stamp
-        self.marker_pub.publish(self.Cluster2Marker(LidarAllFiltered, stamp, count))
+        print(LidarAllFiltered.shape)
+        if LidarAllFiltered.shape[0]>10:
+            stamp = self.bboxes_array_msg.header.stamp
+            self.Cluster2Marker(LidarAllFiltered, stamp, count)
 
-    def BboxInLidarDirection(self, bbox_msg, camera_info, RotMat):
-        K_inv = inv(camera_info)
+    def BboxInLidarDirection(self, bbox_msg, camId,lidarId):
+        K_inv = inv(self.cam_matrix[camId])
+        # print(boxes_to_matirx([bbox_msg], 0))
         camera_corners_cam = K_inv@boxes_to_matirx([bbox_msg], 0)
-        R_inv = inv(RotMat)
+        R_inv = inv(self.RotMat[(camId,lidarId)])
         # Apply the inverse rotation matrix
         camera_corners_lid = R_inv@camera_corners_cam  # This operation will make the bottom row not necessarily zero
         # The First is the Z-axis of the lidar frame
@@ -304,18 +339,17 @@ class Lidar2Cam(Node):
         camera_corners_lid_normed = camera_corners_lid_normed.T
         return camera_corners_lid_normed
 
-    def PointSelection(self, point_cloud_msg, camera_corners_lid_normed_list, RotMat_list, translation_list):
+    def PointSelection(self, lidarId, camera_corners_lid_normed_list, camIdList):
         # 3
         # Normalize all points on their Z-axis
-
+        point_cloud_msg=self.lidar_msg[lidarId]
         ptc_numpy_record = pointcloud2_to_array(point_cloud_msg)
         ptc_xyz_lidar = get_xyz_points(ptc_numpy_record)  # (N * 3 matrix)
         mask = np.full((ptc_xyz_lidar.shape[0],), False)
 
-        for j in range(len(camera_corners_lid_normed_list)):
-            camera_corners_lid_normed = camera_corners_lid_normed_list[j]
-            RotMat = RotMat_list[j]
-            translation = translation_list[j]
+        for camera_corners_lid_normed,camId in zip(camera_corners_lid_normed_list,camIdList):
+            RotMat = self.RotMat[(camId,lidarId)]
+            translation = self.translation[(camId,lidarId)]
             R_inv = inv(RotMat)
             trans = R_inv@translation
             ptc_xyz_lidar_trans = ptc_xyz_lidar-trans[np.newaxis, :]
@@ -334,7 +368,7 @@ class Lidar2Cam(Node):
 
         ptc_xyz_lidar_filtered = ptc_xyz_lidar[mask]
         num_lidar = np.sum(mask)
-        print('num lidar in bbox:', num_lidar)
+        # print('num lidar in bbox:', num_lidar)
         return ptc_xyz_lidar_filtered
 
     # ---------------------------------------------------------------------------- #
@@ -346,12 +380,12 @@ class Lidar2Cam(Node):
         )
         labels = np.array(
             o3d_pcd.cluster_dbscan(
-                eps=1.8, min_points=max(int(ptc_xyz_camera_list.shape[0]/4/BboxCount), 10), print_progress=False
+                eps=1.8, min_points=max(int(ptc_xyz_camera_list.shape[0]/1.5/BboxCount), 10), print_progress=False
             )
         )
         max_label = labels.max()
         print('label num:', max_label+1)
-
+        self.point2img(ptc_xyz_camera_list[labels!=-1],4,1)
         # ---------------------------------------------------------------------------- #
         #                                Calculate 3D BBox                             #
         # ---------------------------------------------------------------------------- #
@@ -372,7 +406,7 @@ class Lidar2Cam(Node):
         # # ---------------------------------------------------------------------------- #
         # #                   Creating a Marker Object to be published                   #
         # # ---------------------------------------------------------------------------- #
-        markerList = []
+        # markerList = []
         count = 0
         for cluster_bbox, _, _ in median_xyz_camera:
             count += 1
@@ -382,16 +416,16 @@ class Lidar2Cam(Node):
                 center = cluster_bbox.get_center()
                 extent = cluster_bbox.extent
                 rotation = cluster_bbox.R.copy()
-                rotation[2] *= -1
+                # rotation[2] *= -1
                 rotation = Rotation.from_matrix(rotation).as_quat()
                 center = [center[0], -center[1], center[2]]
             else:
                 center = cluster_bbox.get_center()
                 extent = cluster_bbox.get_extent()
                 center = [center[0], -center[1], center[2]]
-
+            print(center)
             marker_msg = Marker()
-            marker_msg.header.frame_id = "luminar_right"
+            marker_msg.header.frame_id = "luminar_front"
             marker_msg.header.stamp = stamp
             marker_msg.ns = "Lidar_detection"
             marker_msg.id = 0
@@ -411,19 +445,58 @@ class Lidar2Cam(Node):
             marker_msg.color.a = 0.5
             marker_msg.color.r = 1.0
             marker_msg.lifetime = Duration(sec=0, nanosec=400000000)
-            markerList.append(marker_msg)
-        return markerList
+            self.marker_pub.publish(marker_msg)
+        # return markerList
+    # ---------------------------------------------------------------------------- #
+    #                  Reflecting the points on the labelled image                 #
+    # ---------------------------------------------------------------------------- #
+    def point2img(self,ptc_xyz_lidar,camid,lidarid):
+        if self.img  is not None:
+            if ptc_xyz_lidar.shape[0]>0:
+                image = self.img_tocv2(self.img)
+                print(image.shape)
+                ptc_xyz_camera_filtered = self.RotMat[(camid,lidarid)] @ ptc_xyz_lidar.T + self.translation[(camid,lidarid)][:,np.newaxis]
+                ptc_xyz_camera_filtered = self.cam_matrix[camid] @ ptc_xyz_camera_filtered
+                ptc_xyz_camera_filtered = ptc_xyz_camera_filtered.T
+                ptc_z_camera = ptc_xyz_camera_filtered[:, 2].reshape((-1, 1))
+                ptc_xyz_camera_filtered = ptc_xyz_camera_filtered/(ptc_z_camera)
+                
+                
+                border_size=0
+                image_undistorted=cv2.copyMakeBorder(image,border_size,border_size,border_size,border_size,cv2.BORDER_CONSTANT,None,0)
 
-    def main(args=None):
-        rclpy.init(args=args)
+                z_min=np.min(ptc_z_camera)
+                z_range=np.max(ptc_z_camera)-z_min
+                ptc_z_camera=(ptc_z_camera-z_min)*255/z_range
+                ptc_z_camera=ptc_z_camera.astype(np.uint8)
+                color=cv2.applyColorMap(ptc_z_camera[:,np.newaxis],cv2.COLORMAP_HSV)
+                r=ptc_xyz_camera_filtered.shape[0]
+                for j in range(r):
+                    i=ptc_xyz_camera_filtered[j]
+                    c=color[np.newaxis,np.newaxis,j,0]
+                    a = int(np.floor(i[0]) + border_size)
+                    b = int(np.floor(i[1]) + border_size)
+                    if a>1 and b>1:
+                        try:
+                            image_undistorted[b-1:b+2,a-1:a+2] = c
+                        except:
+                            continue
 
-        minimal_subscriber = Lidar2Cam()
-        print("going to spin")
-        rclpy.spin(minimal_subscriber)
-        print("destroying node")
-        # Destroy the node explicitly
-        minimal_subscriber.destroy_node()
-        rclpy.shutdown()
+                # Publishing the Image and PointCloud
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(image_undistorted))
+            else:
+                self.image_pub.publish(self.img)
 
-    if __name__ == '__main__':
-        main()
+def main(args=None):
+    rclpy.init(args=args)
+
+    minimal_subscriber = Lidar2Cam()
+    print("going to spin")
+    rclpy.spin(minimal_subscriber)
+    print("destroying node")
+    # Destroy the node explicitly
+    minimal_subscriber.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

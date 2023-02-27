@@ -2,6 +2,8 @@
 1) rviz2
 2) Yolo node:
     ros2 run tensorrt_yolov7 tensorrt_yolov7_node_exe --ros-args -p engine_path:="/home/roar/ART/perception/model_trials/NVIDIA_AI_IOT_tensorrt_yolov7/yolo_deepstream/tensorrt_yolov7/build/yolov7PTQ.engine" -p debug:=0 -p frame_id:="a"
+  Best:
+    ros2 run tensorrt_yolov7 tensorrt_yolov7_node_exe --ros-args -p engine_path:="/home/roar/ART/perception/model_trials/yolov7_iac/yolov7_ptq_folded_f16_i8_flc_fl_rl.engine" -p debug:=0 -p frame_id:="a"
 3) rosbag:
     cd ~
     cd Chris

@@ -1,0 +1,22 @@
+running develop
+running egg_info
+creating lidar_camera_projection.egg-info
+writing lidar_camera_projection.egg-info/PKG-INFO
+writing dependency_links to lidar_camera_projection.egg-info/dependency_links.txt
+writing entry points to lidar_camera_projection.egg-info/entry_points.txt
+writing requirements to lidar_camera_projection.egg-info/requires.txt
+writing top-level names to lidar_camera_projection.egg-info/top_level.txt
+writing manifest file 'lidar_camera_projection.egg-info/SOURCES.txt'
+reading manifest file 'lidar_camera_projection.egg-info/SOURCES.txt'
+writing manifest file 'lidar_camera_projection.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/python3.8/site-packages/lidar-camera-projection.egg-link (link to .)
+Installing lidar_cam_node script to /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/lidar_camera_projection
+
+Installed /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection
+running install_data
+creating /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/ament_index
+creating /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/ament_index/resource_index
+creating /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/ament_index/resource_index/packages
+copying resource/lidar_camera_projection -> /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/ament_index/resource_index/packages
+copying package.xml -> /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection

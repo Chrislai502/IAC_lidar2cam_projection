@@ -1,0 +1,2 @@
+[console_scripts]
+lidar_cam_node = lidar_camera_projection.lidarchris_node:main

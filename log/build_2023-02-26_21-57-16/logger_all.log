@@ -1,0 +1,94 @@
+[0.390s] [34mcolcon[0m [1;30mDEBUG[0m [32mCommand line arguments: ['/usr/bin/colcon', 'build', '--symlink-install', '--packages-select', 'lidar_camera_projection'][0m
+[0.390s] [34mcolcon[0m [1;30mDEBUG[0m [32mParsed command line arguments: Namespace(allow_overriding=[], ament_cmake_args=None, base_paths=['.'], build_base='build', catkin_cmake_args=None, catkin_skip_building_tests=False, cmake_args=None, cmake_clean_cache=False, cmake_clean_first=False, cmake_force_configure=False, cmake_target=None, cmake_target_skip_unavailable=False, continue_on_error=False, event_handlers=None, executor='parallel', ignore_user_meta=False, install_base='install', log_base=None, log_level=None, main=<bound method BuildVerb.main of <colcon_core.verb.build.BuildVerb object at 0x7f488242b8b0>>, merge_install=False, metas=['./colcon.meta'], packages_above=None, packages_above_and_dependencies=None, packages_above_depth=None, packages_end=None, packages_ignore=None, packages_ignore_regex=None, packages_select=['lidar_camera_projection'], packages_select_build_failed=False, packages_select_by_dep=None, packages_select_regex=None, packages_select_test_failures=False, packages_skip=None, packages_skip_build_finished=False, packages_skip_by_dep=None, packages_skip_regex=None, packages_skip_test_passed=False, packages_skip_up_to=None, packages_start=None, packages_up_to=None, packages_up_to_regex=None, parallel_workers=48, paths=None, symlink_install=True, test_result_base=None, verb_extension=<colcon_core.verb.build.BuildVerb object at 0x7f488242b8b0>, verb_name='build', verb_parser=<colcon_defaults.argument_parser.defaults.DefaultArgumentsDecorator object at 0x7f4881bb5250>)[0m
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(colcon_meta) check parameters
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) check parameters
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) check parameters
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) check parameters
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(colcon_meta) discover
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) discover
+[0.433s] [34mcolcon.colcon_core.package_discovery[0m [1;30mINFO[0m Crawling recursively for packages in '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection'
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['ignore', 'ignore_ament_install']
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ignore'
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ignore_ament_install'
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['colcon_pkg']
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'colcon_pkg'
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['colcon_meta']
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'colcon_meta'
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extensions ['ros']
+[0.433s] [34mcolcon.colcon_core.package_identification[0m [1;30mLevel 1[0m _identify(.) by extension 'ros'
+[0.445s] [34mcolcon.colcon_core.package_identification[0m [1;30mDEBUG[0m [32mPackage '.' with type 'ros.ament_python' and name 'lidar_camera_projection'[0m
+[0.445s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(recursive) using defaults
+[0.445s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) discover
+[0.445s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(ignore) using defaults
+[0.445s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) discover
+[0.445s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(path) using defaults
+[0.462s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(prefix_path) check parameters
+[0.462s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(prefix_path) discover
+[0.465s] [34mcolcon.colcon_installed_package_information.package_discovery[0m [1;30mDEBUG[0m [32mFound 8 installed packages in /home/roar/ROAR_ROS/iac_dev_ws/install[0m
+[0.468s] [34mcolcon.colcon_installed_package_information.package_discovery[0m [1;30mDEBUG[0m [32mFound 387 installed packages in /opt/ros/galactic[0m
+[0.470s] [34mcolcon.colcon_core.package_discovery[0m [1;30mLevel 1[0m discover_packages(prefix_path) using defaults
+[0.552s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_args' from command line to 'None'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_target' from command line to 'None'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_target_skip_unavailable' from command line to 'False'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_clean_cache' from command line to 'False'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_clean_first' from command line to 'False'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'cmake_force_configure' from command line to 'False'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'ament_cmake_args' from command line to 'None'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'catkin_cmake_args' from command line to 'None'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mLevel 5[0m set package 'lidar_camera_projection' build argument 'catkin_skip_building_tests' from command line to 'False'
+[0.553s] [34mcolcon.colcon_core.verb[0m [1;30mDEBUG[0m [32mBuilding package 'lidar_camera_projection' with the following arguments: {'ament_cmake_args': None, 'build_base': '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection', 'catkin_cmake_args': None, 'catkin_skip_building_tests': False, 'cmake_args': None, 'cmake_clean_cache': False, 'cmake_clean_first': False, 'cmake_force_configure': False, 'cmake_target': None, 'cmake_target_skip_unavailable': False, 'install_base': '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection', 'merge_install': False, 'path': '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection', 'symlink_install': True, 'test_result_base': None}[0m
+[0.554s] [34mcolcon.colcon_core.executor[0m [1;30mINFO[0m Executing jobs using 'parallel' executor
+[0.559s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mrun_until_complete[0m
+[0.559s] [34mcolcon.colcon_ros.task.ament_python.build[0m [1;30mINFO[0m Building ROS package in '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection' with build type 'ament_python'
+[0.560s] [34mcolcon.colcon_core.shell[0m [1;30mLevel 1[0m create_environment_hook('lidar_camera_projection', 'ament_prefix_path')
+[0.564s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_core.shell.bat': Not used on non-Windows systems
+[0.564s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/ament_prefix_path.ps1'
+[0.565s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment descriptor '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/ament_prefix_path.dsv'
+[0.565s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/ament_prefix_path.sh'
+[0.567s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.568s] [34mcolcon.colcon_core.shell[0m [1;30mDEBUG[0m [32mSkip shell extension 'dsv' for command environment[0m
+[0.964s] [34mcolcon.colcon_core.task.python.build[0m [1;30mINFO[0m Building Python package in '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection'
+[0.967s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Skip shell extension 'powershell' for command environment: Not usable outside of PowerShell
+[0.967s] [34mcolcon.colcon_core.shell[0m [1;30mDEBUG[0m [32mSkip shell extension 'dsv' for command environment[0m
+[1.753s] [34mcolcon.colcon_core.event_handler.log_command[0m [1;30mDEBUG[0m [32mInvoking command in '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection': PYTHONPATH=/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/prefix_override:/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/build --no-deps install_data[0m
+[2.593s] [34mcolcon.colcon_core.shell[0m [1;30mLevel 1[0m create_environment_hook('lidar_camera_projection', 'pythonpath_develop')
+[2.596s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.ps1'
+[2.597s] [34mcolcon.colcon_core.event_handler.log_command[0m [1;30mDEBUG[0m [32mInvoked command in '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection' returned '0': PYTHONPATH=/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/prefix_override:/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/python3.8/site-packages:${PYTHONPATH} /usr/bin/python3 setup.py develop --editable --build-directory /home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/build --no-deps install_data[0m
+[2.597s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment descriptor '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.dsv'
+[2.597s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.sh'
+[2.603s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection' for CMake module files
+[2.603s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection' for CMake config files
+[2.604s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib'
+[2.604s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/bin'
+[2.604s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/pkgconfig/lidar_camera_projection.pc'
+[2.604s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/lib/python3.8/site-packages'
+[2.604s] [34mcolcon.colcon_core.shell[0m [1;30mLevel 1[0m create_environment_hook('lidar_camera_projection', 'pythonpath')
+[2.606s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath.ps1'
+[2.607s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment descriptor '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath.dsv'
+[2.607s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating environment hook '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath.sh'
+[2.607s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m checking '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/bin'
+[2.607s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m create_environment_scripts_only(lidar_camera_projection)
+[2.610s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/package.ps1'
+[2.610s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package descriptor '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/package.dsv'
+[2.611s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/package.sh'
+[2.611s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/package.bash'
+[2.611s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating package script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/lidar_camera_projection/package.zsh'
+[2.612s] [34mcolcon.colcon_core.environment[0m [1;30mLevel 1[0m create_file_with_runtime_dependencies(/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/lidar_camera_projection/share/colcon-core/packages/lidar_camera_projection)
+[2.612s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mclosing loop[0m
+[2.612s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mloop closed[0m
+[2.612s] [34mcolcon.colcon_parallel_executor.executor.parallel[0m [1;30mDEBUG[0m [32mrun_until_complete finished with '0'[0m
+[2.613s] [34mcolcon.colcon_core.event_reactor[0m [1;30mDEBUG[0m [32mjoining thread[0m
+[2.616s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_notification.desktop_notification.terminal_notifier': Not used on non-Darwin systems
+[2.616s] [34mcolcon.colcon_core.plugin_system[0m [1;30mINFO[0m Skipping extension 'colcon_notification.desktop_notification.win32': Not used on non-Windows systems
+[2.616s] [34mcolcon.colcon_notification.desktop_notification[0m [1;30mINFO[0m Sending desktop notification using 'notify2'
+[2.625s] [34mcolcon.colcon_core.event_reactor[0m [1;30mDEBUG[0m [32mjoined thread[0m
+[2.627s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/local_setup.ps1'
+[2.628s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix util module '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/_local_setup_util_ps1.py'
+[2.628s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/setup.ps1'
+[2.630s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/local_setup.sh'
+[2.630s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix util module '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/_local_setup_util_sh.py'
+[2.630s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/setup.sh'
+[2.632s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/local_setup.bash'
+[2.632s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/setup.bash'
+[2.633s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/local_setup.zsh'
+[2.634s] [34mcolcon.colcon_core.shell[0m [1;30mINFO[0m Creating prefix chain script '/home/roar/ROAR_ROS/iac_dev_ws/src/lidar_camera_projection/install/setup.zsh'

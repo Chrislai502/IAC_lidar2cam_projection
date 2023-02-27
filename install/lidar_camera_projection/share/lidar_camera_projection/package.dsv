@@ -1,0 +1,9 @@
+source;share/lidar_camera_projection/hook/pythonpath.ps1
+source;share/lidar_camera_projection/hook/pythonpath.dsv
+source;share/lidar_camera_projection/hook/pythonpath.sh
+source;share/lidar_camera_projection/hook/ament_prefix_path.ps1
+source;share/lidar_camera_projection/hook/ament_prefix_path.dsv
+source;share/lidar_camera_projection/hook/ament_prefix_path.sh
+source;../../build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.ps1
+source;../../build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.dsv
+source;../../build/lidar_camera_projection/share/lidar_camera_projection/hook/pythonpath_develop.sh

@@ -448,7 +448,8 @@ class Lidar2Cam(Node):
             cluster = o3d_pcd.select_by_index(list(np.where(labels == i)[0]))
             if bbox_rotate_mode:
                 # cluster_bbox = cluster.get_oriented_bounding_box()
-                X = np.asarray(cluster.points)[:, :2].T
+                # X = np.asarray(cluster.points)[:, :2].T
+                X = np.array(cluster)[:, [1, 2]]  # Remove the z-axis
                 dtheta = np.deg2rad(1.0)
                 min_dist_of_closeness_crit = 0.01 #[m]
                 minp = (-float('inf'), None)
